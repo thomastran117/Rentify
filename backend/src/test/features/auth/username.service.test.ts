@@ -65,6 +65,10 @@ function createHarness() {
     check: jest.fn(() => "possibly-present" as string),
     add: jest.fn(async () => undefined),
   };
+  const emailBloomService = {
+    check: jest.fn(() => "possibly-present" as string),
+    add: jest.fn(async () => undefined),
+  };
   const otpService = {
     issue: jest.fn(async () => ({ code: "123456", ttlInSeconds: 600 })),
   };
@@ -74,6 +78,7 @@ function createHarness() {
   const pendingSignupStore = new PendingSignupStore(
     cacheService as never,
     usernameBloomService as never,
+    emailBloomService as never,
   );
   const publicOtpService = new PublicOtpService(
     cacheService as never,
@@ -86,6 +91,7 @@ function createHarness() {
     cacheService,
     authRepository,
     usernameBloomService,
+    emailBloomService,
     emailService,
     pendingSignupStore,
     service: new UsernameService(
@@ -353,5 +359,22 @@ describe("UsernameService.forgotUsername", () => {
     expect(
       harness.emailService.sendUsernameReminderEmail,
     ).not.toHaveBeenCalled();
+  });
+
+  it("always queries, so a reminder still reaches a real account", async () => {
+    // A sibling instance can answer `definitely-absent` for an address that
+    // exists after a dropped Redis write. Trusting that here would silently
+    // stop sending reminders until the next rebuild.
+    const harness = createHarness();
+    harness.emailBloomService.check.mockReturnValue("definitely-absent");
+    harness.authRepository.findUserByEmail.mockResolvedValue(createUser());
+
+    await harness.service.forgotUsername({
+      client: createClient(),
+      email: "user@example.com",
+    });
+
+    expect(harness.authRepository.findUserByEmail).toHaveBeenCalled();
+    expect(harness.emailService.sendUsernameReminderEmail).toHaveBeenCalled();
   });
 });

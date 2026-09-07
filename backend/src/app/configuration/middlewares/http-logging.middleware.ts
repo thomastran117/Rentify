@@ -14,6 +14,12 @@ const SENSITIVE_EXACT_QUERY_KEYS = new Set([
   "client_secret",
   "code",
   "code_verifier",
+  // Not a credential, but personal data that must not be persisted in plain
+  // text. `/auth/email/available` puts an address in the query string on every
+  // debounced keystroke, and the repository redacts emails everywhere else it
+  // logs them (see `redact-email.ts`).
+  "email",
+  "email_address",
   "id_token",
   "jwt",
   "nonce",

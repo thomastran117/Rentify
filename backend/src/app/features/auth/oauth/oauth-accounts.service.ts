@@ -21,7 +21,7 @@ import type {
   UnlinkOAuthProviderInput,
 } from "@/features/auth/oauth/oauth-accounts.model";
 import { AuthSessionService } from "@/features/auth/session/session.service";
-import type { UsernameBloomService } from "@/features/auth/username-bloom/username-bloom.service";
+import type { IdentityBloomService } from "@/features/auth/identity-bloom/identity-bloom.service";
 import type { Uuid } from "@/configuration/validation/uuid";
 import { asUuid } from "@/configuration/validation/uuid";
 
@@ -38,7 +38,8 @@ export class OAuthAccountsService {
     private readonly googleOAuthService: GoogleOAuthService,
     private readonly microsoftOAuthService: MicrosoftOAuthService,
     private readonly appleOAuthService: AppleOAuthService,
-    private readonly usernameBloomService: UsernameBloomService,
+    private readonly usernameBloomService: IdentityBloomService,
+    private readonly emailBloomService: IdentityBloomService,
     private readonly mfaTotpService: MfaTotpService,
     private readonly authSessionService: AuthSessionService,
   ) {}
@@ -184,6 +185,7 @@ export class OAuthAccountsService {
         this.usernameBloomService.check(candidate) === "possibly-present",
     );
     await this.usernameBloomService.add(user.profile.username);
+    await this.emailBloomService.add(user.email);
     const session = await this.authSessionService.authenticateVerifiedUser(
       user,
       input,

@@ -96,6 +96,30 @@ describe("httpLoggingMiddleware", () => {
     expect(output).not.toContain("bearer-token");
   });
 
+  it("redacts email addresses out of the logged URL", async () => {
+    // `/auth/email/available` puts an address in the query string on every
+    // debounced keystroke. It is not a credential, but persisting it verbatim
+    // would leave a plain-text record of who is signing up.
+    const app = createApp();
+    const writeSpy = spyStdout();
+
+    const response = await app.request(
+      "http://rent.test/oauth/callback?email=casey%40example.com&emailAddress=river%40example.com&page=2",
+    );
+
+    expect(response.status).toBe(200);
+
+    const output = writeSpy.mock.calls
+      .map(([message]) => String(message))
+      .join("\n");
+    expect(output).toContain("page=2");
+    expect(output).toContain("email=%5BREDACTED%5D");
+    expect(output).toContain("emailAddress=%5BREDACTED%5D");
+    expect(output).not.toContain("casey%40example.com");
+    expect(output).not.toContain("casey@example.com");
+    expect(output).not.toContain("river");
+  });
+
   it("labels the log line and structured fields with the caller type", async () => {
     const app = createApp("frontend-browser");
     const writeSpy = spyStdout();

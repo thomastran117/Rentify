@@ -74,6 +74,11 @@ function createHarness() {
     emailService as never,
   );
 
+  const emailBloomService = {
+    check: jest.fn(() => "unknown" as string),
+    add: jest.fn(async () => undefined),
+  };
+
   return {
     store,
     ttls,
@@ -81,6 +86,7 @@ function createHarness() {
     authRepository,
     otpService,
     emailService,
+    emailBloomService,
     service: new LoginLockoutService(
       cacheService as never,
       authRepository as never,
@@ -275,5 +281,21 @@ describe("LoginLockoutService.resendUnlockLocalLogin", () => {
       }),
     ).resolves.toEqual({ accepted: true });
     expect(harness.emailService.sendLoginUnlockEmail).not.toHaveBeenCalled();
+  });
+
+  it("always queries, so a locked account can still be recovered", async () => {
+    // A sibling instance can answer `definitely-absent` for an address that
+    // exists after a dropped Redis write. Trusting that here would leave a
+    // locked-out user unable to get their unlock code until the next rebuild.
+    const harness = createHarness();
+    harness.emailBloomService.check.mockReturnValue("definitely-absent");
+    harness.authRepository.findUserByEmail.mockResolvedValue(createUser());
+
+    await harness.service.resendUnlockLocalLogin({
+      client: createClient(),
+      email: "user@example.com",
+    });
+
+    expect(harness.authRepository.findUserByEmail).toHaveBeenCalled();
   });
 });
