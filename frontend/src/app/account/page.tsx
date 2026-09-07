@@ -7,6 +7,7 @@ import {
   ChevronDown,
   KeyRound,
   Lock,
+  Mail,
   Monitor,
   Phone,
   Shield,
@@ -20,6 +21,7 @@ import {
 import { useAuth } from "@/components/auth/auth-context";
 import { MfaVerificationDialog } from "@/components/auth/mfa-verification-dialog";
 import { HomeMfaTotpPanel } from "@/components/home/home-mfa-totp-panel";
+import { AccountEmailPanel } from "@/components/account/account-email-panel";
 import { HomePasswordPanel } from "@/components/home/home-password-panel";
 import { authApi } from "@/lib/auth/api";
 import { getApiErrorMessage } from "@/lib/api/user-messages";
@@ -785,6 +787,24 @@ export default function AccountPage() {
         {/* ── Security tab — content ── */}
         {activeTab === "security" && securityUnlocked && (
           <div className="space-y-5">
+            {/* Email address */}
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6">
+              <div className="mb-5 flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300">
+                  <Mail className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold text-slate-950 dark:text-white">
+                    Email address
+                  </h2>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    Used to sign in and to recover your account
+                  </p>
+                </div>
+              </div>
+              <AccountEmailPanel />
+            </div>
+
             {/* Password */}
             <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6">
               <div className="mb-5 flex items-center gap-3">

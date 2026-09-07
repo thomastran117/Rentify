@@ -103,6 +103,9 @@ import { PasswordService } from "@/features/auth/password/password.service";
 import { LoginLockoutService } from "@/features/auth/lockout/login-lockout.service";
 import { EmailAvailabilityController } from "@/features/auth/email-availability/email-availability.controller";
 import { EmailAvailabilityService } from "@/features/auth/email-availability/email-availability.service";
+import { EmailChangeController } from "@/features/auth/email-change/email-change.controller";
+import { EmailChangeService } from "@/features/auth/email-change/email-change.service";
+import { EmailChangeStore } from "@/features/auth/email-change/email-change.store";
 import { UsernameController } from "@/features/auth/username/username.controller";
 import { UsernameService } from "@/features/auth/username/username.service";
 import { IdentityBloomStore } from "@/features/auth/identity-bloom/identity-bloom.store";
@@ -448,6 +451,12 @@ export const containerTokens = {
   ),
   emailBloomService:
     createServiceToken<IdentityBloomService>("EmailBloomService"),
+  emailChangeStore: createServiceToken<EmailChangeStore>("EmailChangeStore"),
+  emailChangeService:
+    createServiceToken<EmailChangeService>("EmailChangeService"),
+  emailChangeController: createServiceToken<EmailChangeController>(
+    "EmailChangeController",
+  ),
   emailAvailabilityService: createServiceToken<EmailAvailabilityService>(
     "EmailAvailabilityService",
   ),

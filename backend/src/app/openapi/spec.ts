@@ -37,6 +37,16 @@ function stripUndefinedDeep<TValue>(value: TValue): TValue {
 }
 
 const requestIdExample = "req_01HZY9ZX8D3G7ZP5QJ7S3C4D5E";
+const emailChangeRequestExample = {
+  newEmail: "o***@rentify.local",
+  expiresInSeconds: 600,
+  resendAvailableInSeconds: 60,
+};
+const pendingEmailChangeExample = {
+  pending: true,
+  newEmail: "o***@rentify.local",
+  expiresInSeconds: 540,
+};
 const authSessionExample = {
   accessToken: "access-token-1",
   refreshToken: "refresh-token-1",
@@ -1854,6 +1864,154 @@ function buildOperations(): OperationDefinition[] {
           verificationStatusExample,
         ),
         ...commonErrors([401, 403, 429, 500]),
+      },
+    },
+    {
+      method: "post",
+      path: "/auth/email/change",
+      operationId: "requestEmailChange",
+      summary: "Request a change to the account email address",
+      description:
+        "Starts a change of the signed-in account's email address. Requires a recent multi-factor verification for the `mfa-management` scope. A six-digit code is sent to the new address and a security notice is sent to the current one; nothing changes until the code is confirmed. Available to accounts that sign in with a password and to accounts that only use a social provider.",
+      tags: ["auth"],
+      security: [{ bearerAuth: [] }],
+      permissions: {
+        authMode: "session-bearer",
+        minimumRole: "user",
+        patAllowed: false,
+        rateLimitPolicy: "auth-sensitive",
+      },
+      requestBody: requestBody("RequestEmailChangeRequest", {
+        email: "owner-one-new@rentify.local",
+      }),
+      responses: {
+        "202": successResponse(
+          202,
+          "Verification code sent to the new email address.",
+          "EmailChangeRequestResult",
+          emailChangeRequestExample,
+        ),
+        ...commonErrors([400, 401, 403, 409, 429, 500]),
+      },
+    },
+    {
+      method: "post",
+      path: "/auth/email/change/resend",
+      operationId: "resendEmailChangeCode",
+      summary: "Re-send the email change verification code",
+      description:
+        "Issues a new six-digit code for the email change already in progress and sends it to the pending address. Does not require a fresh multi-factor verification: the change was authorised when it was requested, and the pending record cannot exist without that authorisation.",
+      tags: ["auth"],
+      security: [{ bearerAuth: [] }],
+      permissions: {
+        authMode: "session-bearer",
+        minimumRole: "user",
+        patAllowed: false,
+        rateLimitPolicy: "auth-sensitive",
+      },
+      responses: {
+        "202": successResponse(
+          202,
+          "Verification code re-sent to the new email address.",
+          "EmailChangeRequestResult",
+          emailChangeRequestExample,
+        ),
+        ...commonErrors([400, 401, 403, 409, 429, 500]),
+      },
+    },
+    {
+      method: "post",
+      path: "/auth/email/change/confirm",
+      operationId: "confirmEmailChange",
+      summary: "Confirm a pending email address change",
+      description:
+        "Completes the change using the code sent to the new address, then returns a refreshed authenticated session carrying the new email. Every other session on the account is invalidated. Deliberately not gated on a recent multi-factor verification: the write itself invalidates any outstanding verification proof, and the emailed code is the second factor for this step.",
+      tags: ["auth"],
+      security: [{ bearerAuth: [] }],
+      permissions: {
+        authMode: "session-bearer",
+        minimumRole: "user",
+        patAllowed: false,
+        rateLimitPolicy: "auth-sensitive",
+      },
+      requestBody: requestBody("ConfirmEmailChangeRequest", {
+        code: "123456",
+      }),
+      responses: {
+        "200": successResponse(
+          200,
+          "Email address changed successfully.",
+          "AuthSessionResponseData",
+          authSessionExample,
+        ),
+        ...commonErrors([400, 401, 403, 409, 429, 500]),
+      },
+    },
+    {
+      method: "get",
+      path: "/auth/email/change",
+      operationId: "getPendingEmailChange",
+      summary: "Read the pending email address change",
+      description:
+        "Reports whether an email change is awaiting confirmation, so a client can restore the confirmation step after a reload. The pending address is redacted.",
+      tags: ["auth"],
+      security: [{ bearerAuth: [] }],
+      permissions: {
+        authMode: "session-bearer",
+        minimumRole: "user",
+        patAllowed: false,
+      },
+      responses: {
+        "200": successResponse(
+          200,
+          "Request completed successfully.",
+          "PendingEmailChangeResult",
+          pendingEmailChangeExample,
+        ),
+        ...commonErrors([401, 403, 429, 500]),
+      },
+    },
+    {
+      method: "delete",
+      path: "/auth/email/change",
+      operationId: "cancelEmailChange",
+      summary: "Cancel a pending email address change",
+      description:
+        "Discards the pending change and releases the claim on the address. Idempotent: cancelling when nothing is pending succeeds.",
+      tags: ["auth"],
+      security: [{ bearerAuth: [] }],
+      permissions: {
+        authMode: "session-bearer",
+        minimumRole: "user",
+        patAllowed: false,
+      },
+      responses: {
+        "204": noContentResponse("Email change cancelled."),
+        ...commonErrors([401, 403, 429, 500]),
+      },
+    },
+    {
+      method: "get",
+      path: "/auth/email/change/dev/otp",
+      operationId: "previewPendingEmailChangeOtp",
+      summary: "Preview the pending email change code (non-production only)",
+      description:
+        "Returns the code currently issued for the caller's pending email change. Registered only outside production: local and test environments suppress delivery to `@rentify.local`, so seeded accounts have no inbox to read the code from.",
+      tags: ["auth"],
+      security: [{ bearerAuth: [] }],
+      permissions: {
+        authMode: "session-bearer",
+        minimumRole: "user",
+        patAllowed: false,
+      },
+      responses: {
+        "200": successResponse(
+          200,
+          "Request completed successfully.",
+          "EmailChangeOtpPreviewResult",
+          { code: "123456", expiresInSeconds: 540 },
+        ),
+        ...commonErrors([401, 403, 404, 429, 500]),
       },
     },
     {
@@ -9702,6 +9860,50 @@ function buildComponents(): Record<string, unknown> {
           code: { type: "string", pattern: "^\\d{6}$" },
           newPassword: { type: "string" },
           deviceId: { type: "string" },
+        },
+      },
+      RequestEmailChangeRequest: {
+        type: "object",
+        required: ["email"],
+        properties: {
+          email: { type: "string", format: "email", maxLength: 255 },
+        },
+      },
+      ConfirmEmailChangeRequest: {
+        type: "object",
+        required: ["code"],
+        properties: {
+          code: { type: "string", pattern: "^\\d{6}$" },
+        },
+      },
+      EmailChangeRequestResult: {
+        type: "object",
+        required: ["newEmail", "expiresInSeconds", "resendAvailableInSeconds"],
+        properties: {
+          newEmail: {
+            type: "string",
+            description:
+              "The pending address, redacted. Any session on the account can read this back, so the full address is never echoed.",
+          },
+          expiresInSeconds: { type: "integer" },
+          resendAvailableInSeconds: { type: "integer" },
+        },
+      },
+      PendingEmailChangeResult: {
+        type: "object",
+        required: ["pending"],
+        properties: {
+          pending: { type: "boolean" },
+          newEmail: { type: "string" },
+          expiresInSeconds: { type: "integer" },
+        },
+      },
+      EmailChangeOtpPreviewResult: {
+        type: "object",
+        required: ["code", "expiresInSeconds"],
+        properties: {
+          code: { type: "string" },
+          expiresInSeconds: { type: "integer" },
         },
       },
       ChangePasswordRequest: {

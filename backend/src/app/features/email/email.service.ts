@@ -8,6 +8,26 @@ export interface SendVerificationEmailInput {
   expiresInMinutes?: number;
 }
 
+export interface SendEmailChangeCodeEmailInput {
+  to: string;
+  verificationCode: string;
+  firstName?: string;
+  expiresInMinutes?: number;
+}
+
+/**
+ * Goes to the address being moved away from, which is the one channel a
+ * hijacked session does not control. `newEmail` is already redacted by the
+ * caller — telling the old inbox in full where the account is going would hand
+ * that same attacker's target to anyone reading over the owner's shoulder, and
+ * the owner only needs enough to recognise whether they made the request.
+ */
+export interface SendEmailChangeNoticeEmailInput {
+  to: string;
+  newEmail: string;
+  firstName?: string;
+}
+
 export interface SendMfaStepUpEmailInput {
   to: string;
   verificationCode: string;
@@ -94,6 +114,18 @@ export class EmailService {
     input: SendVerificationEmailInput,
   ): Promise<void> {
     await this.emailQueueService.enqueueEmailJob("verification", input);
+  }
+
+  async sendEmailChangeCodeEmail(
+    input: SendEmailChangeCodeEmailInput,
+  ): Promise<void> {
+    await this.emailQueueService.enqueueEmailJob("email_change_code", input);
+  }
+
+  async sendEmailChangeNoticeEmail(
+    input: SendEmailChangeNoticeEmailInput,
+  ): Promise<void> {
+    await this.emailQueueService.enqueueEmailJob("email_change_notice", input);
   }
 
   async sendMfaStepUpEmail(input: SendMfaStepUpEmailInput): Promise<void> {

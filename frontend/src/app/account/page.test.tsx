@@ -65,6 +65,9 @@ vi.mock("@/components/home/home-mfa-totp-panel", () => ({
 vi.mock("@/components/home/home-password-panel", () => ({
   HomePasswordPanel: () => <div>Password panel</div>,
 }));
+vi.mock("@/components/account/account-email-panel", () => ({
+  AccountEmailPanel: () => <div>Email panel</div>,
+}));
 vi.mock("@/lib/auth/api", () => ({
   authApi: {
     linkedOAuthProviders: linkedProvidersMock,

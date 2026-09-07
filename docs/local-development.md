@@ -136,6 +136,30 @@ MFA_BYPASS_EMAILS=owner1@rentify.local,user1@rentify.local
 
 This bypass applies to both sign-in MFA and account-management step-up MFA, and it is ignored in `production`.
 
+The list is matched on the account's **current** email, so changing a seeded
+account's address through Account → Security → Email address takes it out of the
+bypass and the step-up dialog starts appearing for real. That is the easiest way
+to exercise the dialog locally; to put the account back, either change the
+address back or add the new one to `MFA_BYPASS_EMAILS`.
+
+## Changing An Account Email
+
+The flow is deliberately two-sided: starting a change needs a recent
+`mfa-management` step-up, and finishing it needs the 6-digit code sent to the
+**new** address. Because `@rentify.local` recipients are suppressed outside
+production (`backend/src/app/features/email/email-suppression.ts`), no mail
+actually arrives for seeded accounts — the job is queued but not delivered.
+
+Read the pending code the same way the MFA dialog's code is read, through a
+non-production-only route:
+
+```bash
+GET /auth/email/change/dev/otp      # the caller's own pending change
+GET /auth/mfa/verify/dev/otp?scope=mfa-management
+```
+
+Both are registered only when `NODE_ENV` is not `production`.
+
 ## Working Package-by-Package
 
 Backend only:

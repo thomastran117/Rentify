@@ -1,3 +1,4 @@
+import { Prisma } from "@/generated/prisma/client";
 import { UsersRepository } from "@/features/auth/users/users.repository";
 import type { VerifiedOAuthProfile } from "@/features/auth/oauth/oauth.types";
 import ConflictError from "@/errors/http/conflict.error";
@@ -295,6 +296,78 @@ describe("UsersRepository", () => {
     );
     expect(found?.id).toBe(USER_1_ID);
     expect(created.passwordHash).toBeUndefined();
+  });
+
+  describe("updateUserEmail", () => {
+    it("lower-cases the address and verifies it in the same write", async () => {
+      const update = jest.fn(async () =>
+        createUserPersistence({ email: "owner-one-new@rentify.local" }),
+      );
+      const repository = new UsersRepository({
+        user: {
+          update,
+        },
+      } as any);
+
+      const updated = await repository.updateUserEmail(
+        USER_1_ID,
+        "  Owner-One-New@Rentify.local  ",
+      );
+
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            id: USER_1_ID,
+          },
+          data: {
+            email: "owner-one-new@rentify.local",
+            emailVerified: true,
+          },
+        }),
+      );
+      expect(updated.email).toBe("owner-one-new@rentify.local");
+    });
+
+    /**
+     * The Redis reservation upstream is advisory; this constraint is the one
+     * that actually decides a race, so its failure has to arrive as a conflict
+     * rather than an unhandled Prisma error.
+     */
+    it("turns a unique-constraint violation into a conflict", async () => {
+      const uniqueViolation = Object.assign(
+        new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+          code: "P2002",
+          clientVersion: "7.0.0",
+        }),
+      );
+      const update = jest.fn(async () => {
+        throw uniqueViolation;
+      });
+      const repository = new UsersRepository({
+        user: {
+          update,
+        },
+      } as any);
+
+      await expect(
+        repository.updateUserEmail(USER_1_ID, "taken@rentify.local"),
+      ).rejects.toBeInstanceOf(ConflictError);
+    });
+
+    it("lets an unrelated database failure through untouched", async () => {
+      const update = jest.fn(async () => {
+        throw new Error("connection reset");
+      });
+      const repository = new UsersRepository({
+        user: {
+          update,
+        },
+      } as any);
+
+      await expect(
+        repository.updateUserEmail(USER_1_ID, "new@rentify.local"),
+      ).rejects.toThrow("connection reset");
+    });
   });
 
   it("marks a user's email as verified", async () => {

@@ -180,6 +180,16 @@ function isAuthSensitiveRoute(request: Request, pathname: string): boolean {
     return true;
   }
 
+  // Email change — /confirm accepts a 6-digit code over a 10-minute window, and
+  // the request and resend endpoints each send mail to an address the caller
+  // supplies. The default 60/min is too loose for all three.
+  if (
+    request.method === "POST" &&
+    /^\/auth\/email\/change(?:\/(resend|confirm))?$/.test(pathname)
+  ) {
+    return true;
+  }
+
   // TOTP enrollment and verification — guessing codes is feasible at the global
   // default rate (60/min) over the 15-minute pending window; apply the same
   // tight bucket used for login.
