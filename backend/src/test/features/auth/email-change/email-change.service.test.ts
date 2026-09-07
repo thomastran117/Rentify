@@ -285,6 +285,32 @@ describe("EmailChangeService.resendCode", () => {
     expect(result.newEmail).toBe("o***@rentify.local");
   });
 
+  /**
+   * The resent code gets a full TTL of its own. If the record and reservation
+   * kept the original deadline, a code resent late in the window would stop
+   * working minutes before it expired — the user would hold a live code against
+   * a request that no longer exists.
+   */
+  it("pushes the record and the reservation out to match the new code", async () => {
+    const harness = createHarness();
+    const record = createRecord();
+    harness.store.read.mockResolvedValue(record);
+
+    const result = await harness.service.resendCode({
+      userId: USER_ID,
+      client: createClient(),
+    });
+
+    expect(harness.store.write).toHaveBeenCalledWith(record, 600);
+    expect(harness.store.reserveAddress).toHaveBeenCalledWith(
+      NEW_EMAIL,
+      USER_ID,
+      600,
+    );
+    // The reported lifetime is now true of all three, not just the code.
+    expect(result.expiresInSeconds).toBe(600);
+  });
+
   it("refuses when nothing is pending", async () => {
     const harness = createHarness();
 

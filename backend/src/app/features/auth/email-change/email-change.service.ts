@@ -187,6 +187,18 @@ export class EmailChangeService {
       subject: pending.newEmail,
     });
 
+    // The new code carries a full TTL of its own, so the record and the
+    // reservation have to be pushed out to match. Left alone they would keep
+    // the deadline set by the original request, and a code resent late in the
+    // window would stop working minutes before it expired — the user would be
+    // holding a live code against a request that no longer exists.
+    await this.emailChangeStore.write(pending, ttlInSeconds);
+    await this.emailChangeStore.reserveAddress(
+      pending.newEmail,
+      input.userId,
+      ttlInSeconds,
+    );
+
     await this.sendChangeCode(
       user,
       pending.newEmail,

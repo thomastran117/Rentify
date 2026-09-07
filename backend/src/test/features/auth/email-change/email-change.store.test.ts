@@ -16,6 +16,8 @@ function createCache() {
     getJson: jest.fn(async () => null as unknown),
     setJson: jest.fn(async () => undefined),
     setIfNotExists: jest.fn(async () => true),
+    claimOrExtend: jest.fn(async () => true),
+    deleteIfEquals: jest.fn(async () => true),
     expire: jest.fn(async () => true),
     delete: jest.fn(async () => true),
     ttl: jest.fn(async () => 600),
@@ -41,63 +43,47 @@ function createRecord() {
 }
 
 describe("EmailChangeStore reservations", () => {
-  it("claims an unheld address", async () => {
+  /**
+   * Claim-or-refresh has to be one atomic step. Reading the holder and then
+   * extending separately leaves a window where the reservation expires and
+   * another user takes it, after which the extend renews *their* claim while
+   * reporting success to the original caller.
+   */
+  it("claims an address through a single atomic call", async () => {
     const { store, cache } = createStore();
 
     await expect(store.reserveAddress(NEW_EMAIL, USER_ID, 600)).resolves.toBe(
       true,
     );
-    expect(cache.setIfNotExists).toHaveBeenCalledWith(
+    expect(cache.claimOrExtend).toHaveBeenCalledWith(
       getPendingEmailChangeAddressKey(NEW_EMAIL),
       USER_ID,
       600,
     );
     expect(cache.get).not.toHaveBeenCalled();
+    expect(cache.expire).not.toHaveBeenCalled();
+    expect(cache.setIfNotExists).not.toHaveBeenCalled();
   });
 
   it("refuses an address another user is already claiming", async () => {
     const { store, cache } = createStore();
-    cache.setIfNotExists.mockResolvedValue(false);
-    cache.get.mockResolvedValue(OTHER_USER_ID);
+    cache.claimOrExtend.mockResolvedValue(false);
 
     await expect(store.reserveAddress(NEW_EMAIL, USER_ID, 600)).resolves.toBe(
       false,
     );
-    expect(cache.expire).not.toHaveBeenCalled();
   });
 
-  it("refreshes rather than refuses when the caller already holds it", async () => {
+  it("releases through a compare-and-delete rather than a bare delete", async () => {
     const { store, cache } = createStore();
-    cache.setIfNotExists.mockResolvedValue(false);
-    cache.get.mockResolvedValue(USER_ID);
-
-    await expect(store.reserveAddress(NEW_EMAIL, USER_ID, 600)).resolves.toBe(
-      true,
-    );
-    expect(cache.expire).toHaveBeenCalledWith(
-      getPendingEmailChangeAddressKey(NEW_EMAIL),
-      600,
-    );
-  });
-
-  it("releases only a reservation the caller holds", async () => {
-    const { store, cache } = createStore();
-    cache.get.mockResolvedValue(OTHER_USER_ID);
 
     await store.releaseAddress(NEW_EMAIL, USER_ID);
 
+    expect(cache.deleteIfEquals).toHaveBeenCalledWith(
+      getPendingEmailChangeAddressKey(NEW_EMAIL),
+      USER_ID,
+    );
     expect(cache.delete).not.toHaveBeenCalled();
-  });
-
-  it("releases a reservation the caller does hold", async () => {
-    const { store, cache } = createStore();
-    cache.get.mockResolvedValue(USER_ID);
-
-    await store.releaseAddress(NEW_EMAIL, USER_ID);
-
-    expect(cache.delete).toHaveBeenCalledWith(
-      getPendingEmailChangeAddressKey(NEW_EMAIL),
-    );
   });
 });
 
@@ -125,12 +111,12 @@ describe("EmailChangeStore records", () => {
   it("clears both keys, releasing the address the record names", async () => {
     const { store, cache } = createStore();
     cache.getJson.mockResolvedValue(createRecord());
-    cache.get.mockResolvedValue(USER_ID);
 
     await store.clear(USER_ID);
 
-    expect(cache.delete).toHaveBeenCalledWith(
+    expect(cache.deleteIfEquals).toHaveBeenCalledWith(
       getPendingEmailChangeAddressKey(NEW_EMAIL),
+      USER_ID,
     );
     expect(cache.delete).toHaveBeenCalledWith(
       getPendingEmailChangeKey(USER_ID),
@@ -143,6 +129,7 @@ describe("EmailChangeStore records", () => {
     await store.clear(USER_ID);
 
     expect(cache.delete).toHaveBeenCalledTimes(1);
+    expect(cache.deleteIfEquals).not.toHaveBeenCalled();
     expect(cache.delete).toHaveBeenCalledWith(
       getPendingEmailChangeKey(USER_ID),
     );

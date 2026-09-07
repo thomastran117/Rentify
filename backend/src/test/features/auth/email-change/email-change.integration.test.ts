@@ -330,6 +330,46 @@ describe("Email change persistence integration", () => {
     await expect(readPendingChangeCode(session)).resolves.not.toBe(firstCode);
   }, 180_000);
 
+  /**
+   * A resent code carries a full TTL, so the record and the reservation have to
+   * be pushed out with it. Aged down to a minute first: without the extension
+   * they would keep that deadline and the freshly emailed code would stop
+   * working long before it expired.
+   */
+  it("extends the pending record and reservation when a code is resent", async () => {
+    const session = await signInAsOwner();
+    await completeMfaStepUp(session);
+
+    await requestEmailChange(session, NEW_EMAIL);
+
+    const userId = await getRedisClient().get(
+      `auth:pending-email-change-address:${NEW_EMAIL}`,
+    );
+    expect(userId).not.toBeNull();
+
+    const recordKey = `auth:pending-email-change:${userId}`;
+    const addressKey = `auth:pending-email-change-address:${NEW_EMAIL}`;
+    await getRedisClient().expire(recordKey, 60);
+    await getRedisClient().expire(addressKey, 60);
+    await getRedisClient().del(`auth:otp:email-change:${NEW_EMAIL}:cooldown`);
+
+    expect(await getRedisClient().ttl(recordKey)).toBeLessThanOrEqual(60);
+
+    const resendResponse = await resendEmailChangeCode(session);
+    expect(resendResponse.status).toBe(202);
+
+    expect(await getRedisClient().ttl(recordKey)).toBeGreaterThan(500);
+    expect(await getRedisClient().ttl(addressKey)).toBeGreaterThan(500);
+
+    // Still the same user's claim, not a fresh one handed to somebody else.
+    await expect(getRedisClient().get(addressKey)).resolves.toBe(userId);
+
+    // And the extended record still confirms.
+    const code = await readPendingChangeCode(session);
+    const confirmResponse = await confirmEmailChange(session, code);
+    expect(confirmResponse.status).toBe(200);
+  }, 180_000);
+
   it("rate limits a resend inside the cooldown window", async () => {
     const session = await signInAsOwner();
     await completeMfaStepUp(session);

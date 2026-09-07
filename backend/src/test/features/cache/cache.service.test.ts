@@ -319,4 +319,56 @@ describe("CacheService", () => {
     expect(acquireLock).toHaveBeenCalledTimes(3);
     expect(release).toHaveBeenCalledTimes(2);
   });
+  /**
+   * Both of these exist because the read-then-act spelling has a window: the
+   * key can expire and be re-claimed between the read and the write, at which
+   * point the write lands on somebody else's key. The whole point is that the
+   * comparison and the action reach Redis as one script.
+   */
+  it("claims a free key, renews its own, and refuses another owner's", async () => {
+    const client = createRedisClientMock();
+    const service = new CacheService(client as any);
+
+    client.eval.mockResolvedValueOnce(1);
+    await expect(service.claimOrExtend("addr:a", "user-1", 600)).resolves.toBe(
+      true,
+    );
+
+    client.eval.mockResolvedValueOnce(0);
+    await expect(service.claimOrExtend("addr:a", "user-2", 600)).resolves.toBe(
+      false,
+    );
+
+    const [script, options] = client.eval.mock.calls[0] as [
+      string,
+      { keys: string[]; arguments: string[] },
+    ];
+    expect(script).toContain("EXPIRE");
+    expect(script).toContain("SET");
+    expect(options.keys).toEqual(["addr:a"]);
+    expect(options.arguments).toEqual(["user-1", "600"]);
+  });
+
+  it("deletes a key only while it still holds the expected value", async () => {
+    const client = createRedisClientMock();
+    const service = new CacheService(client as any);
+
+    client.eval.mockResolvedValueOnce(1);
+    await expect(service.deleteIfEquals("addr:a", "user-1")).resolves.toBe(
+      true,
+    );
+
+    client.eval.mockResolvedValueOnce(0);
+    await expect(service.deleteIfEquals("addr:a", "user-1")).resolves.toBe(
+      false,
+    );
+
+    const [script, options] = client.eval.mock.calls[0] as [
+      string,
+      { keys: string[]; arguments: string[] },
+    ];
+    expect(script).toContain("DEL");
+    expect(options.keys).toEqual(["addr:a"]);
+    expect(options.arguments).toEqual(["user-1"]);
+  });
 });

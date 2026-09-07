@@ -57,39 +57,27 @@ export class EmailChangeStore {
   /**
    * Claims an address for a user, or confirms they already hold it.
    *
-   * `setIfNotExists` is what makes this safe under a race: two requests for the
-   * same address cannot both succeed, so the loser gets a clean conflict instead
-   * of silently overwriting the winner and having both users believe the address
-   * is theirs until one of them hits the unique constraint.
+   * Two requests for the same address cannot both succeed, so the loser gets a
+   * clean conflict instead of silently overwriting the winner and having both
+   * users believe the address is theirs until one of them hits the unique
+   * constraint.
    *
    * Re-requesting an address you already hold refreshes the TTL rather than
    * failing, so a user who restarts their own request is not locked out by their
-   * own reservation.
+   * own reservation. Claim and refresh happen in one atomic step: split across
+   * separate calls, a reservation expiring mid-sequence would let this report
+   * success to the old owner while extending the new one's claim.
    */
   async reserveAddress(
     email: string,
     userId: string,
     ttlInSeconds: number,
   ): Promise<boolean> {
-    const key = getPendingEmailChangeAddressKey(email);
-    const claimed = await this.cacheService.setIfNotExists(
-      key,
+    return this.cacheService.claimOrExtend(
+      getPendingEmailChangeAddressKey(email),
       userId,
       ttlInSeconds,
     );
-
-    if (claimed) {
-      return true;
-    }
-
-    const holder = await this.cacheService.get(key);
-
-    if (holder === userId) {
-      await this.cacheService.expire(key, ttlInSeconds);
-      return true;
-    }
-
-    return false;
   }
 
   async readAddressHolder(email: string): Promise<string | null> {
@@ -97,17 +85,15 @@ export class EmailChangeStore {
   }
 
   /**
-   * Releases only a reservation this user actually holds. Deleting
-   * unconditionally would let a stale cleanup path drop the claim another user
-   * has since made on the same address.
+   * Releases only a reservation this user actually holds, and checks that
+   * atomically: a separate read and delete would let a late cleanup drop the
+   * claim another user made in between.
    */
   async releaseAddress(email: string, userId: string): Promise<void> {
-    const key = getPendingEmailChangeAddressKey(email);
-    const holder = await this.cacheService.get(key);
-
-    if (holder === userId) {
-      await this.cacheService.delete(key);
-    }
+    await this.cacheService.deleteIfEquals(
+      getPendingEmailChangeAddressKey(email),
+      userId,
+    );
   }
 
   /**
