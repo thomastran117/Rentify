@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { Prisma } from "@/generated/prisma/client";
 import { BaseRepository } from "@/features/base/base.repository";
 import {
   type AuthUserOrganizationMembershipRecord,
@@ -290,6 +291,47 @@ export class UsersRepository extends BaseRepository {
         },
       }),
     );
+  }
+
+  /**
+   * Moves an account to a new address, which the caller has already proven the
+   * user can receive mail at.
+   *
+   * `emailVerified` goes true in the same write. Leaving it false would strip
+   * the `email` factor from the account's MFA options — the address was just
+   * confirmed by an emailed code, so treating it as unverified would be both
+   * wrong and locking.
+   *
+   * The unique index is what actually decides a race for an address. Redis
+   * reservations upstream make the common case answer clearly, but they are
+   * advisory; this is the boundary that cannot be beaten.
+   */
+  async updateUserEmail(userId: Uuid, email: string): Promise<AuthUserRecord> {
+    try {
+      const user = await this.executeAsync(() =>
+        this.prisma.user.update({
+          where: {
+            id: userId,
+          },
+          data: {
+            email: email.trim().toLowerCase(),
+            emailVerified: true,
+          },
+          include: this.buildAuthUserInclude(),
+        }),
+      );
+
+      return this.mapUser(user);
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new ConflictError("That email address is not available.");
+      }
+
+      throw error;
+    }
   }
 
   async activatePendingLocalUser(

@@ -8,6 +8,7 @@ function createService(
   overrides: {
     findUserIdByEmail?: () => Promise<string | null>;
     pendingSignup?: PendingLocalSignupRecord | null;
+    pendingEmailChangeOwnerId?: string | null;
     bloomVerdict?: "definitely-absent" | "possibly-present" | "unknown";
   } = {},
 ) {
@@ -18,6 +19,11 @@ function createService(
   };
   const pendingSignupStore = {
     read: jest.fn(async () => overrides.pendingSignup ?? null),
+  };
+  const emailChangeStore = {
+    readAddressHolder: jest.fn(
+      async () => overrides.pendingEmailChangeOwnerId ?? null,
+    ),
   };
   // Defaults to "unknown" so every case exercises the authoritative path unless
   // it opts into the fast one.
@@ -30,9 +36,16 @@ function createService(
     usersRepository as never,
     emailBloomService as never,
     pendingSignupStore as never,
+    emailChangeStore as never,
   );
 
-  return { service, usersRepository, pendingSignupStore, emailBloomService };
+  return {
+    service,
+    usersRepository,
+    pendingSignupStore,
+    emailBloomService,
+    emailChangeStore,
+  };
 }
 
 describe("EmailAvailabilityService", () => {
@@ -42,6 +55,34 @@ describe("EmailAvailabilityService", () => {
 
       await expect(
         service.isEmailAvailable("casey@example.com"),
+      ).resolves.toEqual({
+        email: "casey@example.com",
+        available: true,
+        reason: null,
+      });
+    });
+
+    it("reports an address another account is mid-change to as taken", async () => {
+      const { service } = createService({
+        pendingEmailChangeOwnerId: "someone-else",
+      });
+
+      await expect(
+        service.isEmailAvailable("casey@example.com"),
+      ).resolves.toEqual({
+        email: "casey@example.com",
+        available: false,
+        reason: "taken",
+      });
+    });
+
+    it("does not report the caller's own pending change as taken", async () => {
+      const { service } = createService({
+        pendingEmailChangeOwnerId: OWNER_ID,
+      });
+
+      await expect(
+        service.isEmailAvailable("casey@example.com", asUuid(OWNER_ID)),
       ).resolves.toEqual({
         email: "casey@example.com",
         available: true,

@@ -551,3 +551,108 @@ describe("EmailDeliveryService", () => {
     });
   });
 });
+
+describe("EmailDeliveryService email change templates", () => {
+  beforeEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  it("routes both email change kinds to their delivery methods", async () => {
+    const transporter = createTransporterMock();
+    const service = createService(transporter);
+
+    const codeSpy = jest
+      .spyOn(service, "sendEmailChangeCodeEmail")
+      .mockResolvedValue(undefined);
+    const noticeSpy = jest
+      .spyOn(service, "sendEmailChangeNoticeEmail")
+      .mockResolvedValue(undefined);
+
+    await service.deliver({
+      jobId: "job-change-1",
+      kind: "email_change_code",
+      input: { to: "new@example.com", verificationCode: "424242" },
+      attempt: 1,
+      occurredAt: "2026-09-07T00:00:00.000Z",
+    });
+    await service.deliver({
+      jobId: "job-change-2",
+      kind: "email_change_notice",
+      input: { to: "old@example.com", newEmail: "n***@example.com" },
+      attempt: 1,
+      occurredAt: "2026-09-07T00:00:00.000Z",
+    });
+
+    expect(codeSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ to: "new@example.com" }),
+    );
+    expect(noticeSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ to: "old@example.com" }),
+    );
+  });
+
+  it("sends the code to the new address and shows it in the body", async () => {
+    const transporter = createTransporterMock();
+    const service = createService(transporter);
+
+    await service.sendEmailChangeCodeEmail({
+      to: "new@example.com",
+      verificationCode: "424242",
+      firstName: "Owner",
+      expiresInMinutes: 10,
+    });
+
+    const [message] = transporter.sendMail.mock.calls[0] as [
+      { to: string; subject: string; text: string; html: string },
+    ];
+
+    expect(message.to).toBe("new@example.com");
+    expect(message.subject).toBe("Confirm your new email address");
+    expect(message.text).toContain("424242");
+    expect(message.html).toContain("424242");
+  });
+
+  /**
+   * The service hands this template an already-redacted address. Asserting the
+   * full address never appears keeps a future edit from "helpfully" rendering
+   * the real target into an inbox that may no longer belong to the owner.
+   */
+  it("warns the old address without naming a code or a full new address", async () => {
+    const transporter = createTransporterMock();
+    const service = createService(transporter);
+
+    await service.sendEmailChangeNoticeEmail({
+      to: "old@example.com",
+      newEmail: "n***@example.com",
+      firstName: "Owner",
+    });
+
+    const [message] = transporter.sendMail.mock.calls[0] as [
+      { to: string; subject: string; text: string; html: string },
+    ];
+
+    expect(message.to).toBe("old@example.com");
+    expect(message.subject).toBe(
+      "Someone requested a change to your account email",
+    );
+    expect(message.html).toContain("n***@example.com");
+    expect(message.html).toContain("https://app.example.com/account");
+    expect(message.text).not.toContain("Verification code");
+  });
+
+  it("suppresses both kinds for non-deliverable local recipients", async () => {
+    const transporter = createTransporterMock();
+    const service = createService(transporter);
+
+    await service.deliver({
+      jobId: "job-change-3",
+      kind: "email_change_code",
+      input: { to: "owner1@rentify.local", verificationCode: "424242" },
+      attempt: 1,
+      occurredAt: "2026-09-07T00:00:00.000Z",
+    });
+
+    expect(transporter.sendMail).not.toHaveBeenCalled();
+  });
+});

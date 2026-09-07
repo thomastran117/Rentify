@@ -4,6 +4,7 @@ import type { LocalAuthController } from "@/features/auth/local/local-auth.contr
 import type { DeviceManagementController } from "@/features/auth/device/device-management.controller";
 import type { OAuthController } from "@/features/auth/oauth/oauth.controller";
 import type { AuthSessionController } from "@/features/auth/session/session.controller";
+import type { EmailChangeController } from "@/features/auth/email-change/email-change.controller";
 import type { EmailAvailabilityController } from "@/features/auth/email-availability/email-availability.controller";
 import type { UsernameController } from "@/features/auth/username/username.controller";
 import type { LoginLockoutController } from "@/features/auth/lockout/login-lockout.controller";
@@ -76,6 +77,56 @@ export const authLocalRouteModule: RouteModule = {
         "checkEmailAvailability",
       ),
     );
+    // Not under /auth/local for the same reason as the availability endpoint
+    // above: an account that only ever signed in through a provider changes its
+    // email here too. Nothing in this flow touches a password.
+    app.post(
+      "/auth/email/change",
+      resolveHandler<EmailChangeController>(
+        containerTokens.emailChangeController,
+        "requestEmailChange",
+      ),
+    );
+    app.post(
+      "/auth/email/change/resend",
+      resolveHandler<EmailChangeController>(
+        containerTokens.emailChangeController,
+        "resendEmailChangeCode",
+      ),
+    );
+    app.post(
+      "/auth/email/change/confirm",
+      resolveHandler<EmailChangeController>(
+        containerTokens.emailChangeController,
+        "confirmEmailChange",
+      ),
+    );
+    app.get(
+      "/auth/email/change",
+      resolveHandler<EmailChangeController>(
+        containerTokens.emailChangeController,
+        "getPendingEmailChange",
+      ),
+    );
+    app.delete(
+      "/auth/email/change",
+      resolveHandler<EmailChangeController>(
+        containerTokens.emailChangeController,
+        "cancelEmailChange",
+      ),
+    );
+    // Local and test environments suppress delivery to @rentify.local, so a
+    // seeded account has no inbox to read the code from. Same shape and same
+    // production guard as /auth/mfa/verify/dev/otp.
+    if (!environment.isProduction()) {
+      app.get(
+        "/auth/email/change/dev/otp",
+        resolveHandler<EmailChangeController>(
+          containerTokens.emailChangeController,
+          "previewPendingEmailChangeOtp",
+        ),
+      );
+    }
     app.post(
       "/auth/local/email/verify",
       resolveHandler<LocalAuthController>(

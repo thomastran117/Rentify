@@ -14,12 +14,14 @@ export const authEmailAvailabilityRegistrationModule: ContainerRegistrationModul
           containerTokens.authUsersRepository,
           containerTokens.emailBloomService,
           containerTokens.pendingSignupStore,
+          containerTokens.emailChangeStore,
         ],
         resolve: ({ resolve }) =>
           new EmailAvailabilityService(
             resolve(containerTokens.authUsersRepository),
             resolve(containerTokens.emailBloomService),
             resolve(containerTokens.pendingSignupStore),
+            resolve(containerTokens.emailChangeStore),
           ),
       });
       container.register({

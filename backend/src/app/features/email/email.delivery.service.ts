@@ -12,6 +12,8 @@ import type { EmailJobPayload } from "@/features/email/email.model";
 import type {
   SendBookingMessageNotificationEmailInput,
   SendLoginUnlockEmailInput,
+  SendEmailChangeCodeEmailInput,
+  SendEmailChangeNoticeEmailInput,
   SendMfaStepUpEmailInput,
   SendNewDeviceEmailInput,
   SendOrganizationInviteEmailInput,
@@ -182,6 +184,12 @@ export class EmailDeliveryService {
       case "verification":
         await this.sendVerificationEmail(payload.input);
         return;
+      case "email_change_code":
+        await this.sendEmailChangeCodeEmail(payload.input);
+        return;
+      case "email_change_notice":
+        await this.sendEmailChangeNoticeEmail(payload.input);
+        return;
       case "mfa_step_up":
         await this.sendMfaStepUpEmail(payload.input);
         return;
@@ -233,6 +241,82 @@ export class EmailDeliveryService {
           this.buildAlertBox(
             "Didn&rsquo;t create this account? You can safely ignore this email &mdash; no action is needed.",
             "info",
+          ),
+        ].join(""),
+      ),
+    });
+  }
+
+  async sendEmailChangeCodeEmail(
+    input: SendEmailChangeCodeEmailInput,
+  ): Promise<void> {
+    const greetingName = this.resolveGreetingName(input.firstName);
+    const escapedGreetingName = escapeHtml(greetingName);
+    const escapedVerificationCode = escapeHtml(input.verificationCode);
+    const expiryCopy = this.formatExpiryCopy(input.expiresInMinutes);
+
+    await this.sendWithRetry({
+      to: input.to,
+      subject: "Confirm your new email address",
+      text: [
+        `Hi ${greetingName},`,
+        "",
+        "Use this code to confirm that this address should become the email on your Rentify account.",
+        "",
+        `Verification code: ${input.verificationCode}`,
+        "",
+        `${expiryCopy} If you did not request this change, you can safely ignore this email — your account keeps its current address.`,
+      ].join("\n"),
+      html: this.buildEmailHtml(
+        [
+          `<h1 style="margin:0 0 16px;font-size:22px;font-weight:600;color:#020617;letter-spacing:-0.03em;">Confirm your new email address</h1>`,
+          `<p style="margin:0 0 16px;font-size:14px;color:#334155;line-height:1.7;">Hi ${escapedGreetingName},</p>`,
+          `<p style="margin:0 0 20px;font-size:14px;color:#334155;line-height:1.7;">Use this code to confirm that this address should become the email on your Rentify account. Until you enter it, nothing changes.</p>`,
+          this.buildCodeBlock("Verification code", escapedVerificationCode),
+          `<p style="margin:8px 0 0;font-size:13px;color:#64748b;text-align:center;">${escapeHtml(expiryCopy)}</p>`,
+          this.buildAlertBox(
+            "Didn&rsquo;t request this change? You can safely ignore this email &mdash; your account keeps its current address.",
+            "info",
+          ),
+        ].join(""),
+      ),
+    });
+  }
+
+  /**
+   * Goes to the address being moved away from. `input.newEmail` arrives already
+   * redacted, so this template must not try to present it as a full address.
+   */
+  async sendEmailChangeNoticeEmail(
+    input: SendEmailChangeNoticeEmailInput,
+  ): Promise<void> {
+    const greetingName = this.resolveGreetingName(input.firstName);
+    const escapedGreetingName = escapeHtml(greetingName);
+    const escapedNewEmail = escapeHtml(input.newEmail);
+    const securityUrl = escapeHtml(`${this.appBaseUrl}/account`);
+
+    await this.sendWithRetry({
+      to: input.to,
+      subject: "Someone requested a change to your account email",
+      text: [
+        `Hi ${greetingName},`,
+        "",
+        `A request was made to move your Rentify account to ${input.newEmail}.`,
+        "",
+        "The change only takes effect once the code sent to that address is confirmed.",
+        "",
+        "If this was you, no action is needed.",
+        "If this wasn't you, change your password and review account access immediately.",
+      ].join("\n"),
+      html: this.buildEmailHtml(
+        [
+          `<h1 style="margin:0 0 16px;font-size:22px;font-weight:600;color:#020617;letter-spacing:-0.03em;">Email change requested</h1>`,
+          `<p style="margin:0 0 16px;font-size:14px;color:#334155;line-height:1.7;">Hi ${escapedGreetingName},</p>`,
+          `<p style="margin:0 0 16px;font-size:14px;color:#334155;line-height:1.7;">A request was made to move your Rentify account to <strong>${escapedNewEmail}</strong>. The change only takes effect once the code sent to that address is confirmed.</p>`,
+          `<p style="margin:0 0 0;font-size:14px;color:#334155;line-height:1.7;">If this was you, no action is needed.</p>`,
+          this.buildAlertBox(
+            `If this wasn&rsquo;t you, <strong>change your password and review account access immediately</strong>. <a href="${securityUrl}" style="color:#9f1239;font-weight:600;">Go to account security &rarr;</a>`,
+            "warning",
           ),
         ].join(""),
       ),

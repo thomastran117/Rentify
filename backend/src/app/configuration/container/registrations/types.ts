@@ -17,6 +17,7 @@ export const CONTAINER_REGISTRATION_MODULE_IDS = [
   "auth-local",
   "auth-username",
   "auth-email-availability",
+  "auth-email-change",
   "auth-lockout",
   "auth-password",
   "auth-personal-access-tokens",

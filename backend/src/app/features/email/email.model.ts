@@ -1,5 +1,7 @@
 import type {
   SendBookingMessageNotificationEmailInput,
+  SendEmailChangeCodeEmailInput,
+  SendEmailChangeNoticeEmailInput,
   SendLoginUnlockEmailInput,
   SendMfaStepUpEmailInput,
   SendNewDeviceEmailInput,
@@ -13,6 +15,8 @@ import type {
 
 export type EmailJobKind =
   | "verification"
+  | "email_change_code"
+  | "email_change_notice"
   | "mfa_step_up"
   | "new_device"
   | "login_unlock"
@@ -25,6 +29,8 @@ export type EmailJobKind =
 
 export type EmailJobInputByKind = {
   verification: SendVerificationEmailInput;
+  email_change_code: SendEmailChangeCodeEmailInput;
+  email_change_notice: SendEmailChangeNoticeEmailInput;
   mfa_step_up: SendMfaStepUpEmailInput;
   new_device: SendNewDeviceEmailInput;
   login_unlock: SendLoginUnlockEmailInput;
@@ -41,6 +47,20 @@ export type EmailJobPayload =
       jobId: string;
       kind: "verification";
       input: SendVerificationEmailInput;
+      attempt: number;
+      occurredAt: string;
+    }
+  | {
+      jobId: string;
+      kind: "email_change_code";
+      input: SendEmailChangeCodeEmailInput;
+      attempt: number;
+      occurredAt: string;
+    }
+  | {
+      jobId: string;
+      kind: "email_change_notice";
+      input: SendEmailChangeNoticeEmailInput;
       attempt: number;
       occurredAt: string;
     }

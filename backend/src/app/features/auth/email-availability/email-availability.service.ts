@@ -2,6 +2,7 @@ import type { UsersRepository } from "@/features/auth/users/users.repository";
 import type { IdentityBloomService } from "@/features/auth/identity-bloom/identity-bloom.service";
 import type { EmailAvailabilityResult } from "@/features/auth/email-availability/email-availability.model";
 import type { PendingSignupStore } from "@/features/auth/pending-signup/pending-signup.store";
+import type { EmailChangeStore } from "@/features/auth/email-change/email-change.store";
 import type { Uuid } from "@/configuration/validation/uuid";
 
 /**
@@ -17,6 +18,7 @@ export class EmailAvailabilityService {
     private readonly usersRepository: UsersRepository,
     private readonly emailBloomService: IdentityBloomService,
     private readonly pendingSignupStore: PendingSignupStore,
+    private readonly emailChangeStore: EmailChangeStore,
   ) {}
 
   /**
@@ -35,6 +37,23 @@ export class EmailAvailabilityService {
       await this.usersRepository.findUserIdByEmail(normalizedEmail);
 
     if (existingUserId && existingUserId !== allowedUserId) {
+      return {
+        email: normalizedEmail,
+        available: false,
+        reason: "taken",
+      };
+    }
+
+    // A signed-in user part-way through moving to this address holds it just as
+    // firmly as a row does, and unlike a signup they have already proved the
+    // account is theirs. Reported as `taken` rather than a reason of its own so
+    // the result shape stays the same: distinguishing "someone owns this" from
+    // "someone is claiming this" would tell a caller something they have no use
+    // for and an attacker something they do.
+    const changeOwnerId =
+      await this.emailChangeStore.readAddressHolder(normalizedEmail);
+
+    if (changeOwnerId && changeOwnerId !== allowedUserId) {
       return {
         email: normalizedEmail,
         available: false,

@@ -96,6 +96,63 @@ export class CacheService {
     return result === "OK";
   }
 
+  /**
+   * Takes a key for `owner`, or renews it if `owner` already holds it.
+   *
+   * The obvious spelling — `setIfNotExists`, then `get`, then `expire` — has a
+   * window an owner can lose their key in: the reservation can expire and be
+   * claimed by somebody else between the read and the renewal, at which point
+   * the renewal extends the *new* owner's key while reporting success to the
+   * old one. Both callers then believe they hold it. Doing all three in one
+   * script removes the window.
+   */
+  async claimOrExtend(
+    key: string,
+    owner: string,
+    ttlInSeconds: number,
+  ): Promise<boolean> {
+    const script = `
+      local current = redis.call("GET", KEYS[1])
+
+      if current == false then
+        redis.call("SET", KEYS[1], ARGV[1], "EX", ARGV[2])
+        return 1
+      end
+
+      if current == ARGV[1] then
+        redis.call("EXPIRE", KEYS[1], ARGV[2])
+        return 1
+      end
+
+      return 0
+    `;
+
+    const result = await this.eval<number>(
+      script,
+      [key],
+      [owner, ttlInSeconds.toString()],
+    );
+
+    return result === 1;
+  }
+
+  /**
+   * Deletes a key only while it still holds `expectedValue`, so a late cleanup
+   * cannot drop a key another owner has since claimed.
+   */
+  async deleteIfEquals(key: string, expectedValue: string): Promise<boolean> {
+    const script = `
+      if redis.call("GET", KEYS[1]) == ARGV[1] then
+        return redis.call("DEL", KEYS[1])
+      end
+
+      return 0
+    `;
+
+    const result = await this.eval<number>(script, [key], [expectedValue]);
+    return result === 1;
+  }
+
   async getOrSetJson<T>(
     key: string,
     factory: () => Promise<T>,

@@ -2,6 +2,7 @@ import { authCoreRegistrationModule } from "@/configuration/container/registrati
 import { authDeviceRegistrationModule } from "@/configuration/container/registrations/modules/auth-device";
 import { authLocalRegistrationModule } from "@/configuration/container/registrations/modules/auth-local";
 import { authEmailAvailabilityRegistrationModule } from "@/configuration/container/registrations/modules/auth-email-availability";
+import { authEmailChangeRegistrationModule } from "@/configuration/container/registrations/modules/auth-email-change";
 import { authUsernameRegistrationModule } from "@/configuration/container/registrations/modules/auth-username";
 import { authLockoutRegistrationModule } from "@/configuration/container/registrations/modules/auth-lockout";
 import { authPasswordRegistrationModule } from "@/configuration/container/registrations/modules/auth-password";
@@ -68,6 +69,7 @@ export const containerRegistrationModules: ContainerRegistrationModule[] = [
   authLocalRegistrationModule,
   authUsernameRegistrationModule,
   authEmailAvailabilityRegistrationModule,
+  authEmailChangeRegistrationModule,
   authLockoutRegistrationModule,
   authPasswordRegistrationModule,
   authPersonalAccessTokensRegistrationModule,
