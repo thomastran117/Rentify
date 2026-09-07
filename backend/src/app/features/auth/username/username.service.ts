@@ -18,7 +18,6 @@ export class UsernameService {
   constructor(
     private readonly usersRepository: UsersRepository,
     private readonly usernameBloomService: IdentityBloomService,
-    private readonly emailBloomService: IdentityBloomService,
     private readonly pendingSignupStore: PendingSignupStore,
     private readonly publicOtpService: PublicOtpService,
   ) {}
@@ -137,15 +136,6 @@ export class UsernameService {
 
     if (!rateLimitResult.allowed) {
       this.publicOtpService.logSuspicious(rateLimitResult);
-      return {
-        accepted: true,
-      };
-    }
-
-    // The response above is the same either way, so an address the email
-    // filter can rule out never needs the lookup — which is the whole of the
-    // work this endpoint does for an address that was never registered.
-    if (this.emailBloomService.check(input.email) === "definitely-absent") {
       return {
         accepted: true,
       };

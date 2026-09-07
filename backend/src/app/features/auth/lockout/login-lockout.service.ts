@@ -4,7 +4,6 @@ import type { CacheService } from "@/features/cache/cache.service";
 import { OtpService } from "@/features/auth/otp/otp.service";
 import { LOCAL_LOGIN_UNLOCK_OTP_PURPOSE } from "@/features/auth/otp/otp-purposes";
 import { PublicOtpService } from "@/features/auth/otp/public-otp.service";
-import type { IdentityBloomService } from "@/features/auth/identity-bloom/identity-bloom.service";
 import type {
   LocalLoginAttemptRecord,
   ResendUnlockLocalLoginInput,
@@ -30,21 +29,7 @@ export class LoginLockoutService {
     private readonly usersRepository: UsersRepository,
     private readonly otpService: OtpService,
     private readonly publicOtpService: PublicOtpService,
-    private readonly emailBloomService: IdentityBloomService,
   ) {}
-
-  /**
-   * Both unlock flows answer identically whether or not the address has an
-   * account — that is what stops them being used to test which emails are
-   * registered — so an address the filter can rule out needs no lookup at all.
-   */
-  private async findUserByEmail(email: string): Promise<AuthUserRecord | null> {
-    if (this.emailBloomService.check(email) === "definitely-absent") {
-      return null;
-    }
-
-    return this.usersRepository.findUserByEmail(email);
-  }
 
   async getAttemptRecord(
     username: string,
@@ -114,7 +99,7 @@ export class LoginLockoutService {
       code: input.code,
     });
 
-    const user = await this.findUserByEmail(input.email);
+    const user = await this.usersRepository.findUserByEmail(input.email);
 
     if (user) {
       await this.clearAttemptRecord(user.profile.username);
@@ -144,7 +129,7 @@ export class LoginLockoutService {
       };
     }
 
-    const user = await this.findUserByEmail(input.email);
+    const user = await this.usersRepository.findUserByEmail(input.email);
     const isLocked = user ? await this.isLocked(user.profile.username) : false;
 
     // Only a locked account gets a code. Sending one regardless would let the

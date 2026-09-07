@@ -16,6 +16,18 @@
  * reservations. Redis accelerates reads here; MySQL and reservation records
  * remain the sources of truth.
  *
+ * **A verdict is advisory, never load-bearing.** `definitely-absent` may only
+ * short-circuit a lookup whose result has no side effect and that something
+ * authoritative re-checks downstream — which today means the availability
+ * endpoints and nothing else. The reason is a gap the mechanisms below do not
+ * close: `add` swallows a failed Redis write, so a single dropped `setBits`
+ * leaves the writer correct while every sibling stays clear until the next
+ * *rebuild* (hours), not the next reload. Those siblings keep reloading
+ * successfully and refreshing their freshness timestamp, so the staleness gate
+ * never fires and they answer `definitely-absent` for a value that exists.
+ * Skipping a lookup that sends mail, creates a row, or decides a conflict on
+ * that verdict would turn a cache miss into wrong behaviour.
+ *
  * Three mechanisms keep the local copy honest, each covering the previous one's
  * blind spot:
  *

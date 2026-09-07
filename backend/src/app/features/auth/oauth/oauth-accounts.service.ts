@@ -170,14 +170,7 @@ export class OAuthAccountsService {
 
     // Signing in with a provider must not silently take over an address that
     // already has an account: the owner links it from inside that account.
-    //
-    // Nothing but existence is read off the row, so an address the filter rules
-    // out skips the lookup. A first sign-in with a brand new address is the
-    // common case, which is exactly the case the filter settles from memory.
-    if (
-      this.emailBloomService.check(profile.email) !== "definitely-absent" &&
-      (await this.usersRepository.findUserByEmail(profile.email))
-    ) {
+    if (await this.usersRepository.findUserByEmail(profile.email)) {
       throw new ConflictError(
         "An account with this email already exists. Sign in with the original method before linking a social provider.",
       );

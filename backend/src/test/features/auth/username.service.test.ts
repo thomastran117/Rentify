@@ -97,7 +97,6 @@ function createHarness() {
     service: new UsernameService(
       authRepository as never,
       usernameBloomService as never,
-      emailBloomService as never,
       pendingSignupStore,
       publicOtpService,
     ),
@@ -362,28 +361,12 @@ describe("UsernameService.forgotUsername", () => {
     ).not.toHaveBeenCalled();
   });
 
-  it("skips the lookup entirely when the email filter rules the address out", async () => {
-    // An address that was never registered is the whole of the work this
-    // endpoint does for a probe, and the filter settles it without a query.
+  it("always queries, so a reminder still reaches a real account", async () => {
+    // A sibling instance can answer `definitely-absent` for an address that
+    // exists after a dropped Redis write. Trusting that here would silently
+    // stop sending reminders until the next rebuild.
     const harness = createHarness();
     harness.emailBloomService.check.mockReturnValue("definitely-absent");
-
-    await expect(
-      harness.service.forgotUsername({
-        client: createClient(),
-        email: "nobody@example.com",
-      }),
-    ).resolves.toEqual({ accepted: true });
-
-    expect(harness.authRepository.findUserByEmail).not.toHaveBeenCalled();
-    expect(
-      harness.emailService.sendUsernameReminderEmail,
-    ).not.toHaveBeenCalled();
-  });
-
-  it("still looks up an address the filter cannot rule out", async () => {
-    const harness = createHarness();
-    harness.emailBloomService.check.mockReturnValue("possibly-present");
     harness.authRepository.findUserByEmail.mockResolvedValue(createUser());
 
     await harness.service.forgotUsername({

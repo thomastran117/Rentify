@@ -483,9 +483,9 @@ describe("Identity bloom filter persistence integration", () => {
     });
   }, 120_000);
 
-  it("loads the container-wired filter so signup can skip its lookup", async () => {
-    // The hot path this feature exists for, through the instance the container
-    // actually hands `LocalAuthService`.
+  it("loads the container-wired filter the availability endpoint reads", async () => {
+    // Through the instance the container actually hands the endpoint, rather
+    // than one this file constructed.
     //
     // Rebuilt at the *environment* sizing rather than this file's smaller test
     // config: the fingerprint is derived from capacity and probe count, so a

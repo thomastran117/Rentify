@@ -199,16 +199,15 @@ describe("OAuthAccountsService sign-in", () => {
     );
   });
 
-  it("skips the conflict lookup when the email filter rules the address out", async () => {
-    // Nothing but existence is read off that row, and a first sign-in with a
-    // brand new address is the common case.
+  it("always runs the conflict lookup, whatever the filter says", async () => {
+    // Trusting a `definitely-absent` verdict here would turn a clean 409 into
+    // a unique-constraint 500 whenever a sibling instance missed the write.
     const harness = createHarness();
     harness.emailBloomService.check.mockReturnValue("definitely-absent");
 
     await harness.service.googleAuthenticate(oauthInput);
 
-    expect(harness.authRepository.findUserByEmail).not.toHaveBeenCalled();
-    expect(harness.authRepository.createOAuthUser).toHaveBeenCalled();
+    expect(harness.authRepository.findUserByEmail).toHaveBeenCalled();
   });
 
   it("still rejects a taken address the filter cannot rule out", async () => {

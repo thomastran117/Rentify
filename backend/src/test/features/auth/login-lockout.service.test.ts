@@ -92,7 +92,6 @@ function createHarness() {
       authRepository as never,
       otpService as never,
       publicOtpService,
-      emailBloomService as never,
     ),
   };
 }
@@ -284,26 +283,12 @@ describe("LoginLockoutService.resendUnlockLocalLogin", () => {
     expect(harness.emailService.sendLoginUnlockEmail).not.toHaveBeenCalled();
   });
 
-  it("skips the user lookup when the email filter rules the address out", async () => {
-    // Both unlock flows answer identically whether or not the address has an
-    // account, so a ruled-out address needs no lookup.
+  it("always queries, so a locked account can still be recovered", async () => {
+    // A sibling instance can answer `definitely-absent` for an address that
+    // exists after a dropped Redis write. Trusting that here would leave a
+    // locked-out user unable to get their unlock code until the next rebuild.
     const harness = createHarness();
     harness.emailBloomService.check.mockReturnValue("definitely-absent");
-
-    await expect(
-      harness.service.resendUnlockLocalLogin({
-        client: createClient(),
-        email: "nobody@example.com",
-      }),
-    ).resolves.toEqual({ accepted: true });
-
-    expect(harness.authRepository.findUserByEmail).not.toHaveBeenCalled();
-    expect(harness.emailService.sendLoginUnlockEmail).not.toHaveBeenCalled();
-  });
-
-  it("still looks up an address the filter cannot rule out", async () => {
-    const harness = createHarness();
-    harness.emailBloomService.check.mockReturnValue("possibly-present");
     harness.authRepository.findUserByEmail.mockResolvedValue(createUser());
 
     await harness.service.resendUnlockLocalLogin({
