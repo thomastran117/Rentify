@@ -6,6 +6,7 @@ import type {
   OAuthIdentityRecord,
 } from "@/features/auth/auth.model";
 import { OAuthAccountsService } from "@/features/auth/oauth/oauth-accounts.service";
+import { OAuthUsernameAllocationConflictError } from "@/features/auth/users/users.repository";
 import { AuthSessionService } from "@/features/auth/session/session.service";
 import { testUuid } from "../../support/uuid";
 const OAUTH_IDENTITY_1_ID = testUuid(9000, 618144);
@@ -134,6 +135,11 @@ function createHarness() {
     check: jest.fn(() => "unknown" as string),
     add: jest.fn(async () => undefined),
   };
+  const usernameService = {
+    suggestUsernames: jest.fn(async () => ({
+      suggestions: ["bright-otter-4827"],
+    })),
+  };
 
   return {
     authRepository,
@@ -142,6 +148,7 @@ function createHarness() {
     appleOAuthService,
     usernameBloomService,
     emailBloomService,
+    usernameService,
     mfaTotpService,
     tokenService,
     service: new OAuthAccountsService(
@@ -152,6 +159,7 @@ function createHarness() {
       appleOAuthService as never,
       usernameBloomService as never,
       emailBloomService as never,
+      usernameService as never,
       mfaTotpService as never,
       new AuthSessionService(
         authRepository as never,
@@ -175,7 +183,10 @@ describe("OAuthAccountsService sign-in", () => {
 
     const result = await harness.service.googleAuthenticate(oauthInput);
 
-    expect(harness.authRepository.createOAuthUser).toHaveBeenCalled();
+    expect(harness.authRepository.createOAuthUser).toHaveBeenCalledWith(
+      expect.objectContaining({ email: createdUser.email }),
+      "bright-otter-4827",
+    );
     expect(result.accessToken).toBe("access-token");
     expect(result.user.email).toBe(createdUser.email);
     expect(result.isNewUser).toBe(true);
@@ -187,6 +198,36 @@ describe("OAuthAccountsService sign-in", () => {
     await harness.service.googleAuthenticate(oauthInput);
 
     expect(harness.usernameBloomService.add).toHaveBeenCalledWith("test-user");
+  });
+
+  it("retries with a fresh suggestion after a username allocation race", async () => {
+    const harness = createHarness();
+    harness.usernameService.suggestUsernames
+      .mockResolvedValueOnce({ suggestions: ["bright-otter-4827"] })
+      .mockResolvedValueOnce({ suggestions: ["calm-willow-1034"] });
+    harness.authRepository.createOAuthUser
+      .mockRejectedValueOnce(new OAuthUsernameAllocationConflictError())
+      .mockResolvedValueOnce(createUser());
+
+    await harness.service.googleAuthenticate(oauthInput);
+
+    expect(harness.authRepository.createOAuthUser).toHaveBeenNthCalledWith(
+      2,
+      googleProfile,
+      "calm-willow-1034",
+    );
+  });
+
+  it("does not retry unrelated OAuth creation failures", async () => {
+    const harness = createHarness();
+    harness.authRepository.createOAuthUser.mockRejectedValue(
+      new Error("email conflict"),
+    );
+
+    await expect(
+      harness.service.googleAuthenticate(oauthInput),
+    ).rejects.toThrow("email conflict");
+    expect(harness.authRepository.createOAuthUser).toHaveBeenCalledTimes(1);
   });
 
   it("adds the provider email to the bloom filter", async () => {

@@ -21,6 +21,7 @@ import { useEmailAvailability } from "@/lib/auth/use-email-availability";
 import { useUsernameAvailability } from "@/lib/auth/use-username-availability";
 import { EmailAvailabilityHint } from "@/components/auth/email-availability-hint";
 import { UsernameAvailabilityHint } from "@/components/auth/username-availability-hint";
+import { UsernameSuggestions } from "@/components/auth/username-suggestions";
 import { getApiErrorMessage } from "@/lib/api/user-messages";
 import type { AuthResponseBody } from "@/lib/auth/types";
 import { ApiClientError } from "@/lib/auth/types";
@@ -659,6 +660,16 @@ export function SignupForm({ nextPath = "/" }: SignupFormProps) {
                   availability={usernameAvailability}
                 />
               )}
+              <UsernameSuggestions
+                disabled={pending}
+                onSelect={(suggestion) => {
+                  setUsername(suggestion);
+                  setErrors((current) => ({
+                    ...current,
+                    username: undefined,
+                  }));
+                }}
+              />
             </div>
 
             <div className="space-y-2">

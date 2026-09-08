@@ -20,6 +20,7 @@ import type {
   SessionVerificationResult,
   SignupVerificationPendingResult,
   UsernameAvailabilityResult,
+  UsernameSuggestionsResult,
   EmailAvailabilityResult,
 } from "@/lib/auth/types";
 import { personalAccessTokensApi } from "@/lib/personal-access-tokens/api";
@@ -311,6 +312,22 @@ export const authApi = {
     return optionalAuthJson<UsernameAvailabilityResult>(
       "GET",
       buildPathWithQuery("/auth/username/available", { username }),
+      undefined,
+      undefined,
+      options.signal,
+    );
+  },
+  getUsernameSuggestions(
+    limit = 3,
+    options: { signal?: AbortSignal } = {},
+  ): Promise<UsernameSuggestionsResult> {
+    if (options.signal?.aborted) {
+      throw new DOMException("The operation was aborted.", "AbortError");
+    }
+
+    return publicJson<UsernameSuggestionsResult>(
+      "GET",
+      buildPathWithQuery("/auth/username/suggestions", { limit }),
       undefined,
       undefined,
       options.signal,

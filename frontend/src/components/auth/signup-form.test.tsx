@@ -15,6 +15,7 @@ const {
   signupMock,
   checkUsernameAvailabilityMock,
   checkEmailAvailabilityMock,
+  getUsernameSuggestionsMock,
   clearCaptchaTokenMock,
   oauthSuccessSessionMock,
 } = vi.hoisted(() => ({
@@ -23,6 +24,7 @@ const {
   signupMock: vi.fn(),
   checkUsernameAvailabilityMock: vi.fn(),
   checkEmailAvailabilityMock: vi.fn(),
+  getUsernameSuggestionsMock: vi.fn(),
   clearCaptchaTokenMock: vi.fn(),
   oauthSuccessSessionMock: vi.fn(),
 }));
@@ -46,6 +48,7 @@ vi.mock("@/lib/auth/api", () => ({
     signup: signupMock,
     checkUsernameAvailability: checkUsernameAvailabilityMock,
     checkEmailAvailability: checkEmailAvailabilityMock,
+    getUsernameSuggestions: getUsernameSuggestionsMock,
   },
 }));
 
@@ -112,6 +115,13 @@ describe("SignupForm", () => {
       available: true,
       reason: null,
     });
+    getUsernameSuggestionsMock.mockResolvedValue({
+      suggestions: [
+        "bright-otter-4827",
+        "calm-willow-1034",
+        "swift-comet-9261",
+      ],
+    });
     useAuthMock.mockReturnValue({
       status: "anonymous",
       setSession: vi.fn(),
@@ -132,6 +142,19 @@ describe("SignupForm", () => {
     render(<SignupForm />);
 
     expect(screen.getByText("Preparing your workspace...")).toBeInTheDocument();
+  });
+
+  it("fills the username field from a suggestion", async () => {
+    const user = userEvent.setup();
+    render(<SignupForm />);
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: "Use username bright-otter-4827",
+      }),
+    );
+
+    expect(screen.getByLabelText("Username")).toHaveValue("bright-otter-4827");
   });
 
   it("redirects authenticated users immediately", async () => {

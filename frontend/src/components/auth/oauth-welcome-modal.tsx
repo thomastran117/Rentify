@@ -11,6 +11,7 @@ import {
 import { PartyPopper, UserRound, X } from "lucide-react";
 import { FieldErrorMessage, FormErrorMessage } from "@/components/errors";
 import { UsernameAvailabilityHint } from "@/components/auth/username-availability-hint";
+import { UsernameSuggestions } from "@/components/auth/username-suggestions";
 import { profilesApi } from "@/lib/profiles/api";
 import { normalizeUsername, validateUsernameFormat } from "@/lib/auth/username";
 import { useUsernameAvailability } from "@/lib/auth/use-username-availability";
@@ -205,6 +206,13 @@ function OAuthWelcomeModalContent({
                 account. Find it any time under Account &rarr; Profile.
               </p>
             )}
+            <UsernameSuggestions
+              disabled={pending}
+              onSelect={(suggestion) => {
+                setValue(suggestion);
+                setFieldError(undefined);
+              }}
+            />
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row-reverse">

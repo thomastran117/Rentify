@@ -175,6 +175,19 @@ describe("resolveRateLimitPolicy", () => {
     });
   });
 
+  it("assigns a bounded policy to username suggestions", () => {
+    const policy = resolveRateLimitPolicy(
+      policyRequest("http://rent.test/auth/username/suggestions?limit=3"),
+    );
+
+    expect(policy).toMatchObject({
+      id: "username-suggestions",
+      strategy: "sliding-window",
+      limit: 20,
+      bucketKey: "GET:username-suggestions",
+    });
+  });
+
   it("does not apply the availability policy to other methods on that path", () => {
     const policy = resolveRateLimitPolicy(
       policyRequest("http://rent.test/auth/username/available", {

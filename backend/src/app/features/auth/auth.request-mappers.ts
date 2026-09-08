@@ -54,9 +54,11 @@ import {
 } from "@/features/auth/email-availability/email-availability.model";
 import {
   usernameAvailabilityQuerySchema,
+  usernameSuggestionsQuerySchema,
   type ForgotUsernameInput,
   type ForgotUsernameRequestBody,
   type UsernameAvailabilityQuery,
+  type UsernameSuggestionsQuery,
 } from "@/features/auth/username/username.model";
 import { asUuid } from "@/configuration/validation/uuid";
 
@@ -106,6 +108,28 @@ export function parseUsernameAvailabilityQuery(
         "Request query validation failed.",
         error.issues.map((issue) => ({
           path: "username",
+          message: issue.message,
+        })),
+      );
+    }
+
+    throw error;
+  }
+}
+
+export function parseUsernameSuggestionsQuery(
+  request: Request,
+): UsernameSuggestionsQuery {
+  try {
+    return usernameSuggestionsQuerySchema.parse({
+      limit: getQuery(request).limit,
+    });
+  } catch (error) {
+    if (error instanceof ZodError) {
+      throw new RequestValidationError(
+        "Request query validation failed.",
+        error.issues.map((issue) => ({
+          path: "limit",
           message: issue.message,
         })),
       );

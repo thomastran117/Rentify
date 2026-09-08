@@ -115,6 +115,36 @@ describe("authApi", () => {
     );
   });
 
+  it("requests a validated number of username suggestions", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            success: true,
+            message: "ok",
+            data: { suggestions: ["bright-otter-4827"] },
+            error: null,
+            meta: { requestId: "request-suggestions" },
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          },
+        ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { authApi } = await import("./api");
+
+    await expect(authApi.getUsernameSuggestions(1)).resolves.toEqual({
+      suggestions: ["bright-otter-4827"],
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8040/api/v1/auth/username/suggestions?limit=1",
+      expect.objectContaining({ method: "GET" }),
+    );
+  });
+
   it("includes authorization and CSRF headers on authenticated writes", async () => {
     const fetchMock = vi.fn(
       async () =>
