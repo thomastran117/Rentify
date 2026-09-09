@@ -28,5 +28,6 @@ COPY --from=build /app/prisma ./prisma
 # `prisma migrate deploy` below reads the datasource URL from this config.
 COPY --from=build /app/prisma.config.ts ./prisma.config.ts
 COPY --from=build /app/dist ./dist
+COPY resources ./resources
 EXPOSE 8040
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]

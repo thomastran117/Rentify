@@ -1,10 +1,15 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { ClientRequestContext } from "@/configuration/http/bindings";
 import ConflictError from "@/errors/http/conflict.error";
 import type { AuthUserRecord } from "@/features/auth/auth.model";
 import { PublicOtpService } from "@/features/auth/otp/public-otp.service";
 import { PendingSignupStore } from "@/features/auth/pending-signup/pending-signup.store";
 import { UsernameService } from "@/features/auth/username/username.service";
-import { createRandomUsernameSuggestion } from "@/features/auth/username/username-suggestions";
+import {
+  createRandomUsernameSuggestion,
+  parseUsernameSuggestionVocabulary,
+} from "@/features/auth/username/username-suggestions";
 import { testUuid } from "../../support/uuid";
 
 const PROFILE_1_ID = testUuid(9000, 548259);
@@ -110,6 +115,40 @@ function createHarness(
 }
 
 describe("username suggestions", () => {
+  it("loads a broad curated vocabulary from the text resource", () => {
+    const vocabulary = parseUsernameSuggestionVocabulary(
+      readFileSync(
+        join(process.cwd(), "resources", "username-suggestion-words.txt"),
+        "utf8",
+      ),
+    );
+
+    expect(vocabulary.adjectives.length).toBeGreaterThanOrEqual(100);
+    expect(vocabulary.nouns.length).toBeGreaterThanOrEqual(100);
+    expect(
+      vocabulary.adjectives.length * vocabulary.nouns.length * 10_000,
+    ).toBeGreaterThanOrEqual(100_000_000);
+  });
+
+  it("rejects malformed or duplicate vocabulary entries", () => {
+    expect(() =>
+      parseUsernameSuggestionVocabulary("bright\n[nouns]\notter"),
+    ).toThrow("must follow a section header");
+    expect(() =>
+      parseUsernameSuggestionVocabulary(
+        "[adjectives]\nbright-one\n[nouns]\notter",
+      ),
+    ).toThrow("Invalid username vocabulary word");
+    expect(() =>
+      parseUsernameSuggestionVocabulary(
+        "[adjectives]\nbright\nbright\n[nouns]\notter",
+      ),
+    ).toThrow("Duplicate username vocabulary word");
+    expect(() =>
+      parseUsernameSuggestionVocabulary("[adjectives]\nbright"),
+    ).toThrow("must contain adjectives and nouns");
+  });
+
   it("creates random candidates in the public username format", () => {
     expect(createRandomUsernameSuggestion()).toMatch(
       /^[a-z]+-[a-z]+-[0-9]{4}$/,
