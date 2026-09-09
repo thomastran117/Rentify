@@ -1658,6 +1658,50 @@ function buildOperations(): OperationDefinition[] {
     },
     {
       method: "get",
+      path: "/auth/username/suggestions",
+      operationId: "suggestUsernames",
+      summary: "Suggest available usernames",
+      description:
+        "Returns distinct, non-identifying random username suggestions that are not currently claimed by an account or reserved by an unverified signup. Suggestions are availability hints and are not reserved by this request.",
+      tags: ["auth"],
+      permissions: {
+        authMode: "public",
+        minimumRole: null,
+        patAllowed: false,
+        rateLimitPolicy: "username-suggestions",
+      },
+      parameters: [
+        queryParam(
+          "limit",
+          {
+            type: "integer",
+            minimum: 1,
+            maximum: 10,
+            default: 3,
+          },
+          "Number of suggestions to return.",
+          3,
+          false,
+        ),
+      ],
+      responses: {
+        "200": successResponse(
+          200,
+          "Request completed successfully.",
+          "UsernameSuggestionsResult",
+          {
+            suggestions: [
+              "bright-otter-4827",
+              "calm-willow-1034",
+              "swift-comet-9261",
+            ],
+          },
+        ),
+        ...commonErrors([400, 429, 500]),
+      },
+    },
+    {
+      method: "get",
       path: "/auth/email/available",
       operationId: "checkEmailAvailability",
       summary: "Check whether an email can be used to sign up",
@@ -10301,6 +10345,24 @@ function buildComponents(): Record<string, unknown> {
             enum: ["taken", null],
             description:
               "Why the username is unavailable, or null when it is available. A username is `taken` when another account holds it or an unverified signup has reserved it.",
+          },
+        },
+      },
+      UsernameSuggestionsResult: {
+        type: "object",
+        required: ["suggestions"],
+        properties: {
+          suggestions: {
+            type: "array",
+            minItems: 1,
+            maxItems: 10,
+            uniqueItems: true,
+            items: {
+              type: "string",
+              minLength: 3,
+              maxLength: 50,
+              pattern: "^[a-z]+-[a-z]+-[0-9]{4}$",
+            },
           },
         },
       },

@@ -68,6 +68,13 @@ export const authLocalRouteModule: RouteModule = {
         "checkUsernameAvailability",
       ),
     );
+    app.get(
+      "/auth/username/suggestions",
+      resolveHandler<UsernameController>(
+        containerTokens.usernameController,
+        "suggestUsernames",
+      ),
+    );
     // Same shape as the username endpoint above, and public for the same
     // reason: the signup form needs an answer before the user submits.
     app.get(

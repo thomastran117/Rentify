@@ -11,6 +11,7 @@ import {
 import { PartyPopper, UserRound, X } from "lucide-react";
 import { FieldErrorMessage, FormErrorMessage } from "@/components/errors";
 import { UsernameAvailabilityHint } from "@/components/auth/username-availability-hint";
+import { UsernameSuggestions } from "@/components/auth/username-suggestions";
 import { profilesApi } from "@/lib/profiles/api";
 import { normalizeUsername, validateUsernameFormat } from "@/lib/auth/username";
 import { useUsernameAvailability } from "@/lib/auth/use-username-availability";
@@ -53,6 +54,9 @@ function OAuthWelcomeModalContent({
   onClose,
 }: OAuthWelcomeModalContentProps) {
   const [value, setValue] = useState(username);
+  const [suggestedUsername, setSuggestedUsername] = useState<
+    string | undefined
+  >();
   const [fieldError, setFieldError] = useState<string | undefined>(undefined);
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -64,6 +68,7 @@ function OAuthWelcomeModalContent({
   );
   const availability = useUsernameAvailability(value, {
     currentUsername: username,
+    suggestedUsername,
   });
 
   async function handleSave() {
@@ -179,6 +184,7 @@ function OAuthWelcomeModalContent({
                 value={value}
                 onChange={(event) => {
                   setValue(event.target.value);
+                  setSuggestedUsername(undefined);
                   setFieldError(undefined);
                 }}
                 className={`h-14 w-full rounded-2xl border bg-white dark:bg-slate-900 pl-12 pr-4 text-[15px] text-slate-900 dark:text-white outline-none transition duration-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 ${
@@ -205,6 +211,14 @@ function OAuthWelcomeModalContent({
                 account. Find it any time under Account &rarr; Profile.
               </p>
             )}
+            <UsernameSuggestions
+              disabled={pending}
+              onSelect={(suggestion) => {
+                setValue(suggestion);
+                setSuggestedUsername(suggestion);
+                setFieldError(undefined);
+              }}
+            />
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row-reverse">

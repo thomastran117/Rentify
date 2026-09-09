@@ -78,6 +78,21 @@ describe("useUsernameAvailability", () => {
     expect(checkUsernameAvailabilityMock).not.toHaveBeenCalled();
   });
 
+  it("immediately trusts a selected server suggestion without a duplicate check", async () => {
+    const { result } = renderHook(() =>
+      useUsernameAvailability("Bright-Otter-4827", {
+        suggestedUsername: "bright-otter-4827",
+      }),
+    );
+
+    expect(result.current).toEqual({
+      status: "available",
+      message: "bright-otter-4827 is available.",
+    });
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    expect(checkUsernameAvailabilityMock).not.toHaveBeenCalled();
+  });
+
   it("sends nothing while disabled", async () => {
     const { result } = renderHook(() =>
       useUsernameAvailability("jane-doe", { enabled: false }),

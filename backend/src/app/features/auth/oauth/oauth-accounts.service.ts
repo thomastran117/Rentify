@@ -1,5 +1,8 @@
 import ConflictError from "@/errors/http/conflict.error";
-import type { UsersRepository } from "@/features/auth/users/users.repository";
+import {
+  OAuthUsernameAllocationConflictError,
+  type UsersRepository,
+} from "@/features/auth/users/users.repository";
 import type { OAuthIdentityRepository } from "@/features/auth/oauth/oauth-identity.repository";
 import type {
   AuthSessionResult,
@@ -24,6 +27,9 @@ import { AuthSessionService } from "@/features/auth/session/session.service";
 import type { IdentityBloomService } from "@/features/auth/identity-bloom/identity-bloom.service";
 import type { Uuid } from "@/configuration/validation/uuid";
 import { asUuid } from "@/configuration/validation/uuid";
+import type { UsernameService } from "@/features/auth/username/username.service";
+
+const OAUTH_USERNAME_ALLOCATION_ATTEMPTS = 5;
 
 /**
  * Sign-in and account linking through the three social providers.
@@ -40,6 +46,7 @@ export class OAuthAccountsService {
     private readonly appleOAuthService: AppleOAuthService,
     private readonly usernameBloomService: IdentityBloomService,
     private readonly emailBloomService: IdentityBloomService,
+    private readonly usernameService: UsernameService,
     private readonly mfaTotpService: MfaTotpService,
     private readonly authSessionService: AuthSessionService,
   ) {}
@@ -176,14 +183,7 @@ export class OAuthAccountsService {
       );
     }
 
-    const user = await this.usersRepository.createOAuthUser(
-      profile,
-      // This callback is a screening hint, not an availability guarantee.
-      // `unknown` must remain false or an unavailable filter would reject every
-      // normal candidate; the repository still confirms the selected username.
-      (candidate) =>
-        this.usernameBloomService.check(candidate) === "possibly-present",
-    );
+    const user = await this.createOAuthUserWithSuggestedUsername(profile);
     await this.usernameBloomService.add(user.profile.username);
     await this.emailBloomService.add(user.email);
     const session = await this.authSessionService.authenticateVerifiedUser(
@@ -191,6 +191,33 @@ export class OAuthAccountsService {
       input,
     );
     return { ...session, isNewUser: true };
+  }
+
+  private async createOAuthUserWithSuggestedUsername(
+    profile: VerifiedOAuthProfile,
+  ): Promise<AuthUserRecord> {
+    let lastConflict: OAuthUsernameAllocationConflictError | undefined;
+
+    for (
+      let attempt = 0;
+      attempt < OAUTH_USERNAME_ALLOCATION_ATTEMPTS;
+      attempt += 1
+    ) {
+      const { suggestions } = await this.usernameService.suggestUsernames(1);
+      const username = suggestions[0]!;
+
+      try {
+        return await this.usersRepository.createOAuthUser(profile, username);
+      } catch (error) {
+        if (!(error instanceof OAuthUsernameAllocationConflictError)) {
+          throw error;
+        }
+
+        lastConflict = error;
+      }
+    }
+
+    throw lastConflict ?? new Error("Unable to assign an OAuth username.");
   }
 
   private async verifyOAuthInput(

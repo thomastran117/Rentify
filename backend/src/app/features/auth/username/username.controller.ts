@@ -6,6 +6,7 @@ import { CaptchaService } from "@/features/auth/captcha/captcha.service";
 import { requireCaptcha } from "@/features/auth/captcha/captcha.guard";
 import {
   parseUsernameAvailabilityQuery,
+  parseUsernameSuggestionsQuery,
   toForgotUsernameInput,
 } from "@/features/auth/auth.request-mappers";
 import { UsernameService } from "@/features/auth/username/username.service";
@@ -33,6 +34,16 @@ export class UsernameController {
       query.username,
       auth?.sub,
     );
+
+    ok(response, result);
+  };
+
+  suggestUsernames = async (
+    request: Request,
+    response: Response,
+  ): Promise<void> => {
+    const query = parseUsernameSuggestionsQuery(request);
+    const result = await this.usernameService.suggestUsernames(query.limit);
 
     ok(response, result);
   };

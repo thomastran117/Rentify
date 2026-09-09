@@ -4,9 +4,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OAuthWelcomeModal } from "./oauth-welcome-modal";
 import { ApiClientError } from "@/lib/auth/types";
 
-const { updateMineMock, checkUsernameAvailabilityMock } = vi.hoisted(() => ({
+const {
+  updateMineMock,
+  checkUsernameAvailabilityMock,
+  getUsernameSuggestionsMock,
+} = vi.hoisted(() => ({
   updateMineMock: vi.fn(),
   checkUsernameAvailabilityMock: vi.fn(),
+  getUsernameSuggestionsMock: vi.fn(),
 }));
 
 vi.mock("@/lib/profiles/api", () => ({
@@ -18,6 +23,7 @@ vi.mock("@/lib/profiles/api", () => ({
 vi.mock("@/lib/auth/api", () => ({
   authApi: {
     checkUsernameAvailability: checkUsernameAvailabilityMock,
+    getUsernameSuggestions: getUsernameSuggestionsMock,
   },
 }));
 
@@ -49,6 +55,13 @@ describe("OAuthWelcomeModal", () => {
       available: true,
       reason: null,
     });
+    getUsernameSuggestionsMock.mockResolvedValue({
+      suggestions: [
+        "bright-otter-4827",
+        "calm-willow-1034",
+        "swift-comet-9261",
+      ],
+    });
   });
 
   it("renders nothing when closed", () => {
@@ -69,6 +82,43 @@ describe("OAuthWelcomeModal", () => {
 
     expect(screen.getByText("Welcome to Rentify")).toBeInTheDocument();
     expect(screen.getByLabelText("Your username")).toHaveValue("jane.doe");
+  });
+
+  it("fills the username field from an available suggestion", async () => {
+    const user = userEvent.setup();
+    renderModal({ username: "bright-beacon-0001" });
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: "Use username calm-willow-1034",
+      }),
+    );
+
+    expect(screen.getByLabelText("Your username")).toHaveValue(
+      "calm-willow-1034",
+    );
+    expect(
+      screen.getByText("calm-willow-1034 is available."),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Checking availability..."),
+    ).not.toBeInTheDocument();
+    expect(checkUsernameAvailabilityMock).not.toHaveBeenCalled();
+  });
+
+  it("lets the user select a suggested alternative", async () => {
+    const user = userEvent.setup();
+    renderModal({ username: "bright-otter-4827" });
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: "Use username calm-willow-1034",
+      }),
+    );
+
+    expect(screen.getByLabelText("Your username")).toHaveValue(
+      "calm-willow-1034",
+    );
   });
 
   it("keeps the generated username without calling the API", async () => {

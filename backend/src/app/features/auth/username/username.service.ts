@@ -7,7 +7,12 @@ import type { IdentityBloomService } from "@/features/auth/identity-bloom/identi
 import type {
   ForgotUsernameInput,
   UsernameAvailabilityResult,
+  UsernameSuggestionsResult,
 } from "@/features/auth/username/username.model";
+import {
+  createRandomUsernameSuggestion,
+  type UsernameSuggestionCandidateFactory,
+} from "@/features/auth/username/username-suggestions";
 import type { Uuid } from "@/configuration/validation/uuid";
 
 /**
@@ -20,7 +25,37 @@ export class UsernameService {
     private readonly usernameBloomService: IdentityBloomService,
     private readonly pendingSignupStore: PendingSignupStore,
     private readonly publicOtpService: PublicOtpService,
+    private readonly createSuggestionCandidate: UsernameSuggestionCandidateFactory = createRandomUsernameSuggestion,
   ) {}
+
+  async suggestUsernames(limit: number): Promise<UsernameSuggestionsResult> {
+    const suggestions = new Set<string>();
+    const maxAttempts = Math.max(limit * 20, 20);
+
+    for (
+      let attempt = 0;
+      attempt < maxAttempts && suggestions.size < limit;
+      attempt += 1
+    ) {
+      const candidate = this.createSuggestionCandidate();
+
+      if (suggestions.has(candidate)) {
+        continue;
+      }
+
+      const availability = await this.isUsernameAvailable(candidate);
+
+      if (availability.available) {
+        suggestions.add(availability.username);
+      }
+    }
+
+    if (suggestions.size < limit) {
+      throw new Error("Unable to generate enough available usernames.");
+    }
+
+    return { suggestions: [...suggestions] };
+  }
 
   /**
    * Whether `username` can be claimed. A name is taken when it belongs to

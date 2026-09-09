@@ -60,6 +60,10 @@ export interface SignupVerificationPendingResult {
   alreadyPending: boolean;
 }
 
+export interface UsernameSuggestionsResult {
+  suggestions: string[];
+}
+
 export interface ForgotPasswordAcceptedResult {
   accepted: true;
 }

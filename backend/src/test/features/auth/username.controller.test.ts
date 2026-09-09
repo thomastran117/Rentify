@@ -24,6 +24,12 @@ function createController() {
       available: true,
       reason: null,
     })),
+    suggestUsernames: jest.fn(async (limit: number) => ({
+      suggestions: Array.from(
+        { length: limit },
+        (_, index) => `bright-otter-${String(index).padStart(4, "0")}`,
+      ),
+    })),
     forgotUsername: jest.fn(async () => ({ accepted: true })),
   };
   const captchaService = {
@@ -106,6 +112,52 @@ describe("UsernameController.checkUsernameAvailability", () => {
     );
 
     expect(captchaService.verify).not.toHaveBeenCalled();
+  });
+});
+
+describe("UsernameController.suggestUsernames", () => {
+  it("returns three suggestions by default", async () => {
+    const { controller, usernameService } = createController();
+
+    const response = await invoke(
+      controller.suggestUsernames,
+      createContext({
+        url: "https://example.test/auth/username/suggestions",
+      }),
+    );
+
+    expect(usernameService.suggestUsernames).toHaveBeenCalledWith(3);
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: { suggestions: expect.arrayContaining(["bright-otter-0000"]) },
+    });
+  });
+
+  it("accepts a validated custom limit", async () => {
+    const { controller, usernameService } = createController();
+
+    await invoke(
+      controller.suggestUsernames,
+      createContext({
+        url: "https://example.test/auth/username/suggestions?limit=5",
+      }),
+    );
+
+    expect(usernameService.suggestUsernames).toHaveBeenCalledWith(5);
+  });
+
+  it("rejects limits outside the supported range", async () => {
+    const { controller, usernameService } = createController();
+
+    await expect(
+      invoke(
+        controller.suggestUsernames,
+        createContext({
+          url: "https://example.test/auth/username/suggestions?limit=11",
+        }),
+      ),
+    ).rejects.toMatchObject({ name: "RequestValidationError" });
+    expect(usernameService.suggestUsernames).not.toHaveBeenCalled();
   });
 });
 

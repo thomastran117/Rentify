@@ -38,6 +38,12 @@ export interface UseUsernameAvailabilityOptions {
    * "available" and read as if something were being claimed.
    */
   currentUsername?: string;
+  /**
+   * A username returned by the suggestions endpoint and selected by the user.
+   * It was confirmed available when suggested, so surface that verdict
+   * immediately instead of repeating the debounced availability request.
+   */
+  suggestedUsername?: string;
   /** Set false to suspend checking, e.g. while the field is locked by a cooldown. */
   enabled?: boolean;
 }
@@ -57,14 +63,18 @@ export function useUsernameAvailability(
   username: string,
   options: UseUsernameAvailabilityOptions = {},
 ): UsernameAvailability {
-  const { currentUsername, enabled = true } = options;
+  const { currentUsername, suggestedUsername, enabled = true } = options;
   const [resolved, setResolved] = useState<ResolvedAvailability | null>(null);
 
   const normalized = normalizeUsername(username);
+  const matchesSuggestion =
+    Boolean(suggestedUsername) &&
+    normalized === normalizeUsername(suggestedUsername ?? "");
   // Format errors are the field validator's job, not the server's.
   const shouldCheck =
     enabled &&
     hasValidUsernameFormat(normalized) &&
+    !matchesSuggestion &&
     !(currentUsername && normalized === normalizeUsername(currentUsername));
 
   useEffect(() => {
@@ -116,6 +126,10 @@ export function useUsernameAvailability(
       window.clearTimeout(timeoutId);
     };
   }, [normalized, shouldCheck]);
+
+  if (matchesSuggestion) {
+    return { status: "available", message: `${normalized} is available.` };
+  }
 
   if (!shouldCheck) {
     return IDLE;

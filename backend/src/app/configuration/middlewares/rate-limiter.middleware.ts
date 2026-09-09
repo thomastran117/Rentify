@@ -212,6 +212,13 @@ function isUsernameAvailabilityRoute(
   return request.method === "GET" && pathname === "/auth/username/available";
 }
 
+function isUsernameSuggestionsRoute(
+  request: Request,
+  pathname: string,
+): boolean {
+  return request.method === "GET" && pathname === "/auth/username/suggestions";
+}
+
 function isEmailAvailabilityRoute(request: Request, pathname: string): boolean {
   return request.method === "GET" && pathname === "/auth/email/available";
 }
@@ -309,6 +316,18 @@ export function resolveRateLimitPolicy(request: Request): RateLimitPolicy {
       windowSeconds: 60,
       bucketCapacity: 10,
       refillTokensPerSecond: 10 / 60,
+    });
+  }
+
+  if (isUsernameSuggestionsRoute(request, pathname)) {
+    return createPolicy(request, {
+      id: "username-suggestions",
+      bucketKey: `${request.method}:username-suggestions`,
+      strategy: "sliding-window",
+      limit: 20,
+      windowSeconds: 60,
+      bucketCapacity: 20,
+      refillTokensPerSecond: 20 / 60,
     });
   }
 

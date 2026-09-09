@@ -1,9 +1,15 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { ClientRequestContext } from "@/configuration/http/bindings";
 import ConflictError from "@/errors/http/conflict.error";
 import type { AuthUserRecord } from "@/features/auth/auth.model";
 import { PublicOtpService } from "@/features/auth/otp/public-otp.service";
 import { PendingSignupStore } from "@/features/auth/pending-signup/pending-signup.store";
 import { UsernameService } from "@/features/auth/username/username.service";
+import {
+  createRandomUsernameSuggestion,
+  parseUsernameSuggestionVocabulary,
+} from "@/features/auth/username/username-suggestions";
 import { testUuid } from "../../support/uuid";
 
 const PROFILE_1_ID = testUuid(9000, 548259);
@@ -45,7 +51,9 @@ function createUser(overrides: Partial<AuthUserRecord> = {}): AuthUserRecord {
   };
 }
 
-function createHarness() {
+function createHarness(
+  createSuggestionCandidate: () => string = () => "bright-otter-4827",
+) {
   const store = new Map<string, unknown>();
   const cacheService = {
     getJson: jest.fn(async (key: string) => store.get(key) ?? null),
@@ -58,7 +66,9 @@ function createHarness() {
     acquireLock: jest.fn(async () => ({ release: jest.fn() })),
   };
   const authRepository = {
-    findUserIdByUsername: jest.fn(async () => null as string | null),
+    findUserIdByUsername: jest.fn(
+      async (_username: string) => null as string | null,
+    ),
     findUserByEmail: jest.fn(async () => null as AuthUserRecord | null),
   };
   const usernameBloomService = {
@@ -99,9 +109,100 @@ function createHarness() {
       usernameBloomService as never,
       pendingSignupStore,
       publicOtpService,
+      createSuggestionCandidate,
     ),
   };
 }
+
+describe("username suggestions", () => {
+  it("loads a broad curated vocabulary from the text resource", () => {
+    const vocabulary = parseUsernameSuggestionVocabulary(
+      readFileSync(
+        join(process.cwd(), "resources", "username-suggestion-words.txt"),
+        "utf8",
+      ),
+    );
+
+    expect(vocabulary.adjectives.length).toBeGreaterThanOrEqual(100);
+    expect(vocabulary.nouns.length).toBeGreaterThanOrEqual(100);
+    expect(
+      vocabulary.adjectives.length * vocabulary.nouns.length * 10_000,
+    ).toBeGreaterThanOrEqual(100_000_000);
+  });
+
+  it("rejects malformed or duplicate vocabulary entries", () => {
+    expect(() =>
+      parseUsernameSuggestionVocabulary("bright\n[nouns]\notter"),
+    ).toThrow("must follow a section header");
+    expect(() =>
+      parseUsernameSuggestionVocabulary(
+        "[adjectives]\nbright-one\n[nouns]\notter",
+      ),
+    ).toThrow("Invalid username vocabulary word");
+    expect(() =>
+      parseUsernameSuggestionVocabulary(
+        "[adjectives]\nbright\nbright\n[nouns]\notter",
+      ),
+    ).toThrow("Duplicate username vocabulary word");
+    expect(() =>
+      parseUsernameSuggestionVocabulary("[adjectives]\nbright"),
+    ).toThrow("must contain adjectives and nouns");
+  });
+
+  it("creates random candidates in the public username format", () => {
+    expect(createRandomUsernameSuggestion()).toMatch(
+      /^[a-z]+-[a-z]+-[0-9]{4}$/,
+    );
+  });
+
+  it("returns the requested number of distinct available suggestions", async () => {
+    const candidates = [
+      "bright-otter-4827",
+      "calm-willow-1034",
+      "swift-comet-9261",
+    ];
+    const harness = createHarness(() => candidates.shift()!);
+
+    await expect(harness.service.suggestUsernames(3)).resolves.toEqual({
+      suggestions: [
+        "bright-otter-4827",
+        "calm-willow-1034",
+        "swift-comet-9261",
+      ],
+    });
+    expect(harness.authRepository.findUserIdByUsername).toHaveBeenCalledTimes(
+      3,
+    );
+  });
+
+  it("skips persisted, reserved, and duplicate candidates", async () => {
+    const candidates = [
+      "taken-forest-1111",
+      "reserved-river-2222",
+      "bright-otter-4827",
+      "bright-otter-4827",
+      "calm-willow-1034",
+    ];
+    const harness = createHarness(() => candidates.shift()!);
+    harness.authRepository.findUserIdByUsername.mockImplementation(
+      async (username: string) =>
+        username === "taken-forest-1111" ? "user-2" : null,
+    );
+    await reserve(harness, "reserved-river-2222", "pending@example.com");
+
+    await expect(harness.service.suggestUsernames(2)).resolves.toEqual({
+      suggestions: ["bright-otter-4827", "calm-willow-1034"],
+    });
+  });
+
+  it("fails cleanly when it cannot find enough distinct candidates", async () => {
+    const harness = createHarness(() => "bright-otter-4827");
+
+    await expect(harness.service.suggestUsernames(2)).rejects.toThrow(
+      "Unable to generate enough available usernames.",
+    );
+  });
+});
 
 async function reserve(
   harness: ReturnType<typeof createHarness>,

@@ -19,6 +19,18 @@ export interface UsernameAvailabilityResult {
   reason: "taken" | null;
 }
 
+export const usernameSuggestionsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(10).default(3),
+});
+
+export type UsernameSuggestionsQuery = z.infer<
+  typeof usernameSuggestionsQuerySchema
+>;
+
+export interface UsernameSuggestionsResult {
+  suggestions: string[];
+}
+
 export const forgotUsernameRequestSchema = z.object({
   email: z.email().transform((value) => value.trim().toLowerCase()),
   captchaToken: requiredSafeTrimmedString("Captcha token is required."),

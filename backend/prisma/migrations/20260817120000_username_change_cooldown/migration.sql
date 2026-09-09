@@ -14,10 +14,10 @@
 -- row is left NULL deliberately: nobody is locked out by the deploy, and each
 -- account keeps one free change, after which the clock starts.
 --
--- `username_auto_generated` marks a profile whose username was derived from the
--- OAuth email local part rather than chosen by the person (see
--- AuthRepository.generateAvailableUsername). Replacing such a name is a *claim*,
--- not a *change*, so it clears this flag without starting the cooldown. Existing
+-- `username_auto_generated` marks a profile whose username was assigned
+-- automatically rather than chosen by the person. Replacing such a name is a
+-- *claim*, not a *change*, so it clears this flag without starting the cooldown.
+-- Existing
 -- OAuth accounts are deliberately NOT backfilled to true: they have had
 -- unrestricted renames until now, and the NULL clock above already grants them a
 -- free change. Only accounts created after this migration get the claim
