@@ -97,6 +97,13 @@ describe("OAuthWelcomeModal", () => {
     expect(screen.getByLabelText("Your username")).toHaveValue(
       "calm-willow-1034",
     );
+    expect(
+      screen.getByText("calm-willow-1034 is available."),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Checking availability..."),
+    ).not.toBeInTheDocument();
+    expect(checkUsernameAvailabilityMock).not.toHaveBeenCalled();
   });
 
   it("lets the user select a suggested alternative", async () => {

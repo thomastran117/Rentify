@@ -155,6 +155,13 @@ describe("SignupForm", () => {
     );
 
     expect(screen.getByLabelText("Username")).toHaveValue("bright-otter-4827");
+    expect(
+      screen.getByText("bright-otter-4827 is available."),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Checking availability..."),
+    ).not.toBeInTheDocument();
+    expect(checkUsernameAvailabilityMock).not.toHaveBeenCalled();
   });
 
   it("redirects authenticated users immediately", async () => {

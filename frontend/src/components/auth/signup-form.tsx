@@ -344,6 +344,9 @@ export function SignupForm({ nextPath = "/" }: SignupFormProps) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [username, setUsername] = useState("");
+  const [suggestedUsername, setSuggestedUsername] = useState<
+    string | undefined
+  >();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -363,7 +366,9 @@ export function SignupForm({ nextPath = "/" }: SignupFormProps) {
       ? persistedAuthFlow
       : null;
   const authFlowRestorePending = persistedAuthFlow === undefined;
-  const usernameAvailability = useUsernameAvailability(username);
+  const usernameAvailability = useUsernameAvailability(username, {
+    suggestedUsername,
+  });
   const usernameTaken = usernameAvailability.status === "taken";
   const emailAvailability = useEmailAvailability(email);
   // Only a taken address blocks. `pending` is informational — signup accepts an
@@ -647,7 +652,10 @@ export function SignupForm({ nextPath = "/" }: SignupFormProps) {
                       : "signup-username-availability"
                   }
                   value={username}
-                  onChange={(event) => setUsername(event.target.value)}
+                  onChange={(event) => {
+                    setUsername(event.target.value);
+                    setSuggestedUsername(undefined);
+                  }}
                   className={theme.auth.fieldInput}
                 />
               </SignupField>
@@ -664,6 +672,7 @@ export function SignupForm({ nextPath = "/" }: SignupFormProps) {
                 disabled={pending}
                 onSelect={(suggestion) => {
                   setUsername(suggestion);
+                  setSuggestedUsername(suggestion);
                   setErrors((current) => ({
                     ...current,
                     username: undefined,
