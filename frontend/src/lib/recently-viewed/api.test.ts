@@ -7,9 +7,10 @@ const { authenticatedJsonMock, optionalAuthJsonMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/api/client", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/api/client")>(
-    "@/lib/api/client",
-  );
+  const actual =
+    await vi.importActual<typeof import("@/lib/api/client")>(
+      "@/lib/api/client",
+    );
 
   return {
     ...actual,
@@ -50,7 +51,9 @@ describe("recentlyViewedApi", () => {
   it("swallows a failed view recording", async () => {
     optionalAuthJsonMock.mockRejectedValue(new Error("offline"));
 
-    await expect(recentlyViewedApi.recordView("posting-1")).resolves.toBeUndefined();
+    await expect(
+      recentlyViewedApi.recordView("posting-1"),
+    ).resolves.toBeUndefined();
   });
 
   it("lists with the default limit", async () => {

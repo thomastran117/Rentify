@@ -86,7 +86,10 @@ export class RecentlyViewedPostingsRepository extends BaseRepository {
     );
   }
 
-  async listRecent(userId: Uuid, limit: number): Promise<RecentlyViewedEntry[]> {
+  async listRecent(
+    userId: Uuid,
+    limit: number,
+  ): Promise<RecentlyViewedEntry[]> {
     const rows = await this.executeAsync(() =>
       this.prisma.recentlyViewedPosting.findMany({
         where: { userId },

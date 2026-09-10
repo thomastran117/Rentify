@@ -18,10 +18,7 @@ const STORAGE_KEY = "rentify.recently-viewed.v1";
 const TRACKING_KEY = "rentify.recently-viewed.enabled";
 
 function seed(entries: { id: string; at: number }[]): void {
-  window.localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({ v: 1, entries }),
-  );
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ v: 1, entries }));
   resetCacheForTests();
 }
 
@@ -154,9 +151,7 @@ describe("recently viewed storage", () => {
 
       expect(snapshot).toHaveLength(RECENTLY_VIEWED_LOCAL_CAP);
       expect(snapshot.map((entry) => entry.id)).not.toContain("posting-0");
-      expect(snapshot[0].id).toBe(
-        `posting-${RECENTLY_VIEWED_LOCAL_CAP + 2}`,
-      );
+      expect(snapshot[0].id).toBe(`posting-${RECENTLY_VIEWED_LOCAL_CAP + 2}`);
     });
 
     it("persists through storage", () => {

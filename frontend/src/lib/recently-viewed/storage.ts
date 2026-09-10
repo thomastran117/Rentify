@@ -140,7 +140,9 @@ function normalize(
   }
 
   return Array.from(latestById, ([id, at]) => ({ id, at }))
-    .sort((left, right) => right.at - left.at || left.id.localeCompare(right.id))
+    .sort(
+      (left, right) => right.at - left.at || left.id.localeCompare(right.id),
+    )
     .slice(0, RECENTLY_VIEWED_LOCAL_CAP);
 }
 

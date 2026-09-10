@@ -87,7 +87,6 @@ export class RecentlyViewedPostingsService {
 
     const entries = await this.resolveSyncEntries(request);
 
-
     if (entries.length > 0) {
       await this.recentlyViewedPostingsRepository.syncMany(userId, entries);
       await this.recentlyViewedPostingsRepository.prune(
